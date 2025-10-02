@@ -1,0 +1,25 @@
+// Existen N personas que deben ser chequeadas por un detector de metales antes de poder ingresar al avión.
+
+// a. Analice el problema y defina qué procesos, recursos y semáforos serán necesarios/convenientes, además de las posibles 
+// sincronizaciones requeridas para resolver el problema.
+// b. Implemente una solución que modele el acceso de las personas a un detector 
+// (es decir, si el detector está libre la persona lo puede utilizar; en caso contrario, debe esperar).
+// c. Modifique su solución para el caso que haya tres detectores.
+
+//a y b.
+
+sem mutex = 1;
+
+process persona[i:0..N-1]{
+    P(mutex)
+    //Usar detector
+    V(mutex)
+}
+
+// c.
+sem mutex = 3;
+process persona[i:0..N-1]{
+    P(mutex)
+    //Usar detector
+    V(mutex)
+}

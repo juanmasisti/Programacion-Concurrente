@@ -1,0 +1,27 @@
+// Un sistema operativo mantiene 5 instancias de un recurso almacenadas en una
+// cola. Además, existen P procesos que necesitan usar una instancia del recurso. 
+// Para eso, deben sacar la instancia de la cola antes de usarla. 
+// Una vez usada, la instancia debe ser encolada nuevamente.
+
+sem disponibles = 5;   // cuántas instancias hay en la cola
+sem mutexCola = 1;     // protege acceso a la estructura de la cola
+colaRecurso c;         // cola con 5 instancias iniciales
+
+process proceso[i:0..P-1] {
+    Recurso r;
+
+    // tomar una instancia
+    P(disponibles);        // espera hasta que haya una instancia libre
+    P(mutexCola);          // proteger la operación sobre la cola, sin esto podrian intentar sacar la misma instancia al mismo tiempo
+    r = c.pop();           // extraer instancia (ahora seguro)
+    V(mutexCola);
+
+    // usar recurso (trabajo fuera de la seccion crítica)
+    usarRecurso(r);
+
+    // devolver la instancia
+    P(mutexCola);
+    c.push(r);             // encolamos la instancia de vuelta
+    V(mutexCola);
+    V(disponibles);        // señalamos que hay una instancia disponible
+}

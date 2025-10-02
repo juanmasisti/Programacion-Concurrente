@@ -1,0 +1,57 @@
+// Ejercicio 1
+// Se dispone de un puente por el cual puede pasar un solo auto a la vez. 
+// Un auto pide permiso para pasar por el puente, cruza por el mismo y luego sigue su camino
+
+Monitor Puente 
+
+    cond cola;
+    int cant= 0;
+
+    Procedure entrarPuente ()
+        while ( cant > 0) wait (cola);
+        cant = cant + 1;
+    end;
+    Procedure salirPuente ()
+        cant = cant - 1;
+        signal(cola);
+    end;
+
+End Monitor;
+
+Process Auto [a:1..M]
+    Puente. entrarPuente (a);
+    “el auto cruza el puente”
+    Puente. salirPuente(a);
+End Process;
+
+// a. ¿El código funciona correctamente? Justifique su respuesta.
+
+// b. ¿Se podría simplificar el programa? ¿Sin monitor? ¿Menos procedimientos? ¿Sin variable condition? En caso afirmativo, rescriba el código.
+
+// c. ¿La solución original respeta el orden de llegada de los vehículos? Si rescribió el código en el punto b), ¿esa solución respeta el orden de llegada?
+
+// Respuesta
+// a. Si, es una solución correcta, ya que cuando un auto va a pasar va llamar al procedimiento de Puente entrarPuente() y va a incrementar la variable cant, 
+// mientras esa variable sea mayor a 0, el resto de autos van a esperar dormidos en wait(cola) y recién cuando el auto que esta cruzando llame a salirPuente() y 
+// disminuya la variable cant, va a despertar a un auto que está esperando para cruzar con el signal(cola). Este va a incrementar la variable cant y va a cruzar, y así sucesivamente.
+
+// Observaciones: el argumento a en las llamadas entrarPuente(a) / salirPuente(a) es innecesario si no se usa dentro del monitor.
+
+// b. Si, se puede simplificar haciendo que el monitor represente el cruce del puente.  
+// Un monitor ya provee exclusión mutua en la entrada a sus procedimientos; para permitir 
+// que sólo un auto pase a la vez basta con un único procedimiento cruzarPuente() que englobe pedir permiso + cruzar + terminar.
+
+Monitor Puente {
+    Procedure cruzarPuente (){
+        //el auto cruza el puente
+        // fin de cruce
+        // al salir del procedimiento, otro auto puede entrar
+    }
+}
+
+Process Auto [a:1..M]{
+    Puente.cruzarPuente();
+}
+// c. No, no lo respeta, ya que cuando un auto se despierta (despierta al primero que se durmió), pasa a competir con el resto de autos para pasar al puente. 
+// No hay garantía del orden de llegada a menos que se programe explícitamente
+// La b. tampoco lo respeta ya que todos los autos van a competir por el uso del monitor.

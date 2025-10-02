@@ -1,0 +1,147 @@
+// Ejercicio 6
+// Existen N personas que deben imprimir un trabajo cada una. Resolver cada ítem usando semáforos:
+
+// a) Implemente una solución suponiendo que existe una única impresora compartida por todas las personas, y las mismas la deben 
+// usar de a una persona a la vez, sin importar el orden. Existe una función Imprimir(documento) llamada por la persona que simula 
+// el uso de la impresora. Sólo se deben usar los procesos que representan a las Personas.
+
+// b) Modifique la solución de a) para el caso en que se deba respetar el orden de llegada.
+
+// c) Modifique la solución de (a) para el caso en que se deba respetar estrictamente el orden dado por el identificador del proceso 
+// (la persona X no puede usar la impresora hasta que no haya terminado de usarla la persona X-1).
+
+// d) Modifique la solución de (b) para el caso en que además hay un proceso Coordinador que le indica a cada persona que es su turno de usar la impresora.
+
+// e) Modificar la solución (d) para el caso en que sean 5 impresoras. El coordinador le indica a la persona cuando puede usar una impresora, y cual debe usar.
+
+// Respuesta
+// Nota: Este ejercicio fue consultado y esta bien resuelto.
+
+a)
+sem mutex = 1; // protege el acceso a la impresora
+
+process Persona [i:0..N-1]{
+    Documento documento;
+    P(mutex);
+    Imprimir(documento);
+    V(mutex);
+}
+
+b)
+colaLlegada c; // cola para mantener el orden de llegada
+sem espera[P] = ([P] 0); // semáforos para que cada persona espere su turno
+sem mutex = 1; // protege el acceso a la cola y a la impresora
+bool libre = true; // indica si la impresora está libre
+
+Process persona [i:0..P-1]{
+    Documento documento;
+    int aux;
+    P(mutex); // consume mutex para verificar si la impresora está libre (inicia en true) y para acceder a la cola 
+    if (libre){ // está libre, puedo usarla
+        libre = false;
+        V(mutex);
+    }
+    else { // no está libre, me encolo y espero
+        c.push(i);
+        V(mutex);
+        P(espera[i]); // espera a que lo despierten
+    }
+    Imprimir(documento);
+    P(mutex); // el mutex va fuera de la impresión para maximizar la concurrencia, ya que solo una persona al mismo tiempo está habilitada para usar la impresora por la lógica la cola.
+    if (c.isEmpty()){
+        libre = true;
+    }
+    else { // si hay alguien esperando en la cola, lo despierto (habilitando su semáforo y permitiendo que use la impresora)
+        aux = c.pop();
+        V(espera[aux]);
+    }
+    V(mutex);
+}
+
+c)
+int turno = 0;
+sem espera[P] = ([P] 0);
+
+Process persona [i:0..P-1]{
+    Documento documento;
+    if (turno != i){ //se podria sacar este if pero se deberia inicializar el semaforo del proceso con i=0 en 1
+        P(espera[i]);
+    }
+    Imprimir(documento);
+    if (turno < P-1){ // si no es el último proceso, despierto al siguiente
+        turno++;
+        V(espera[turno]); // despierta al siguiente proceso, siguiendo el orden de los IDs
+    }
+}
+
+d)
+sem espera[P] = ([P] 0);
+sem mutex = 1;
+sem listo = 0;
+sem llena = 0;
+colaLlegada c;
+
+Process persona [i:0..P-1]{
+    Documento documento;
+    P(mutex); // protege el acceso a la cola
+    c.push(i); // me encolo
+    V(mutex);// libero mutex
+    V(llena); // aviso al coordinador que hay alguien esperando
+    P(espera[i]); // espero a que el coordinador me avise que es mi turno
+    Imprimir(documento); // uso la impresora
+    V(listo); // aviso al coordinador que termine de usar la impresora
+}
+
+Process coordinador{
+    int aux;
+    for i = 0..P-1{ // el indice i no representa el ID del proceso, es solo un contador para hacer P veces el ciclo
+        P(llena); // espero a que haya alguien en la cola
+        P(mutex); // protege el acceso a la cola
+        aux = c.pop(); // saco a la persona que sigue en la cola
+        V(mutex); // libero mutex
+        V(espera[aux]);  // le aviso a la persona que es su turno
+        P(listo); // espero a que la persona termine de usar la impresora
+        // vuelvo al inicio del ciclo para atender a la siguiente persona en la cola
+    }
+}
+
+e)
+sem espera[P] = ([P] 0); // semáforos para que cada persona espere su turno
+sem mutex = 1; // protege el acceso a la cola y a la impresora
+sem llena = 0; // indica si hay personas esperando
+colaLlegada c; // cola para mantener el orden de llegada
+int impresoras[5] = {0,1,2,3,4}; // array que representa las impresoras disponibles
+sem cantImpres = 5; // semáforo que indica cuántas impresoras hay disponibles
+int impAsignada[P] = ([P] -1); // array que indica qué impresora le toca a cada persona
+sem mutexImpresoras = 1; // protege el acceso al array de impresoras
+
+Process persona[i:0..P-1]{
+    Documento documento; 
+    P(mutex); // protege el acceso a la cola
+    c.push(i); // me encolo
+    V(mutex); // libero mutex
+    V(llena); // aviso al coordinador que hay alguien esperando
+    P(espera[i]); // espero a que el coordinador me avise que es mi turno
+    Imprimir(documento, impAsignada[i]); // uso la impresora que me asigno el coordinador
+    P(mutexImpresoras); // protejo el acceso al array de impresoras
+    impresoras.push(impAsignada[i]); // devuelvo la impresora al array de disponibles
+    V(mutexImpresoras);
+    V(impresoras);
+}
+
+Process coordinador{
+    int aux; // variable para almacenar el ID de la persona que sigue en la cola
+    int impaux;  // variable para almacenar la impresora asignada
+    for i = 0..P-1{
+        P(llena); // espero a que haya alguien en la cola
+        P(mutex); // protege el acceso a la cola
+        aux = c.pop(); // saco a la persona que sigue en la cola
+        V(mutex); // libero mutex
+        P(impresoras); // espero a que haya una impresora disponible
+        P(mutexImpresoras); // protejo el acceso al array de impresoras
+        impaux = impresoras.pop(); // asigno una impresora a la persona
+        V(mutexImpresoras); // libero mutex
+        impAsignada[aux] = impaux; // guardo la impresora asignada en el array
+        V(espera[aux]); // le aviso a la persona que es su turno
+    }
+}

@@ -1,0 +1,81 @@
+
+// Ejercicio 2
+// Un sistema de control cuenta con 4 procesos que realizan chequeos en forma colaborativa. Para ello, 
+// reciben el historial de fallos del día anterior (por simplicidad, de tamaño N). De cada fallo, se conoce su número de identificación (ID) 
+// y su nivel de gravedad (0=bajo, 1=intermedio, 2=alto, 3=crítico). Resuelva considerando las siguientes situaciones:
+// a. Se debe imprimir en pantalla los ID de todos los errores críticos (no importa el orden).
+// b. Se debe calcular la cantidad de fallos por nivel de gravedad, debiendo quedar los resultados en un vector global.
+// c. Ídem b. pero cada proceso debe ocuparse de contar los fallos de un nivel de gravedad determinado
+
+// a) 
+sem mutex = 1; int cant = 0; colaFallos c[N];
+
+process controlador[i:0..3]{
+    Fallo fallo;
+    int nivel;
+    P(mutex);
+    while(cant < N){
+        fallo = c.pop();
+        cant++;
+        V(mutex); // una vez que saco el fallo, libero mutex para que otros procesos puedan acceder a la cola
+        // proceso el fallo
+        nivel = fallo.getNivel(); 
+        if (nivel == 3){
+            print(fallo.getID());
+        } 
+        P(mutex); // volver a pedir mutex para procesar el siguiente fallo
+    }
+    V(mutex); // liberar mutex al salir
+}
+
+// b)
+sem mutex = 1; int cant = 0; colaFallos c[N]; 
+sem semNivel[4] = ([4] 1); // semáforos para proteger el acceso a cada posición del array
+array contFallos[4] = ([4] 0); // array global para contar los fallos por nivel
+
+process controlador[i:0..3]{
+    Fallo fallo;
+    int nivel;
+    P(mutex);
+    while(cant < N){
+        fallo = c.pop();
+        cant++;
+        V(mutex); // una vez que saco el fallo, libero mutex para que otros procesos puedan acceder a la cola
+        // proceso el fallo
+        nivel = fallo.getNivel(); 
+        if (nivel == 3){
+            print(fallo.getID());
+        }
+        P(semNivel[nivel]);
+        contFallos[nivel]++;
+        V(semNivel[nivel]);
+        P(mutex); // volver a pedir mutex para procesar el siguiente fallo
+    }
+    V(mutex); // liberar mutex al salir
+}
+
+// c)
+sem mutex = 1; int cant = 0; colaFallos c[N];
+array contFallos[4] = ([4] 0); // array global para contar
+// semáforos por nivel son útiles cuando varios procesos pueden actualizar el mismo contador, en este caso no es necesario
+
+process controlador[i:0..3]{
+    Fallo fallo;
+    //cada proceso tiene un nivel asignado, asumimos que esta dado por el índice del proceso
+    int nivelAsignado = i;
+    P(mutex);
+    while(cant < N){
+        fallo = c.pop();
+        cant++;
+        V(mutex); // una vez que saco el fallo y aumento cant, libero mutex para que otros procesos puedan acceder a la cola
+        // proceso el fallo
+        if (fallo.getNivel() == 3){ // asumimos que todos los procesos deben imprimir los fallos críticos
+            print(fallo.getID());
+        }
+        if (fallo.getNivel() == nivelAsignado){
+            contFallos[nivelAsignado]++;
+        }
+        P(mutex); // volver a pedir mutex para procesar el siguiente fallo
+    }
+    V(mutex); // liberar mutex al salir
+}

@@ -1,0 +1,44 @@
+// Suponga que existe una BD que puede ser accedida por 6 usuarios como máximo al mismo tiempo. Además, los usuarios se clasifican como usuarios de prioridad alta 
+// y usuarios de prioridad baja. Por último, la BD tiene la siguiente restricción:
+
+// no puede haber más de 4 usuarios con prioridad alta al mismo tiempo usando la BD.
+// no puede haber más de 5 usuarios con prioridad baja al mismo tiempo usando la BD.
+// Indique si la solución presentada es la más adecuada. Justifique la respuesta.
+
+//Var
+sem: semaphoro := 6;
+alta: semaphoro := 4;
+baja: semaphoro := 5
+
+Process Usuario-Alta [I:1..L]::	
+  { 
+    P (sem);
+    P (alta);
+    //usa la BD
+    V(sem);
+    V(alta);
+  }
+
+ Process Usuario-Baja [I:1..K]::
+  { 
+    P (sem);
+    P (baja);
+    //usa la BD
+    V(sem);
+    V(baja);
+  }
+
+
+// Respuesta:
+Están mal declaradas las variables, deberían estar:
+sem sem = 6;
+sem alta = 4;
+sem baja = 5;
+La restricción “total ≤ 6” se cumple porque nadie puede entrar sin P(sem) y sem inicia en 6. OK.
+En ese sentido sí garantiza las tres restricciones numéricas.
+
+No considero que sea la mas adecuada ya que debería hacer primero p(alta) o p(baja) y luego p(sem), si no podría ocurrir que usuarios estén bloqueando la entrada a la BD
+sin poder acceder porque su prioridad alcanzo el limite y estarían evitando que otros de distinta prioridad puedan acceder 
+(cuando deberían poder hacerlo porque su prioridad no alcanzo el máximo) Ej.: 6 de alta bloquean la BD pero solo 4 pudieron acceder a ella y 
+los otros 2 no pueden hacerlo pero aun asi tienen la BD bloqueada (sem utilizado por ambos procesos) evitando que entren 2 de prioridad baja (que deberían poder). 
+No se maximiza la concurrencia y hay demora innecesaria.
