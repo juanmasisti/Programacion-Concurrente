@@ -1,0 +1,36 @@
+//Existen N procesos que deben leer información de una base de datos, la cual es administrada 
+//por un motor que admite una cantidad limitada de consultas simultáneas. 
+//a) Analice  el  problema  y  defina  qué  procesos,  recursos  y  monitores/sincronizaciones 
+//serán necesarios/convenientes para resolverlo. 
+//b) Implemente el acceso a la base por parte de los procesos, sabiendo que el motor de 
+//base de datos puede atender a lo sumo 5 consultas de lectura simultáneas.
+
+a)
+//Procesos: N procesos lectores
+//Recursos: Motor de base de datos (con un límite de 5 consultas simultáneas)
+//Monitores/Sincronizaciones: Monitor de acceso a la base de datos
+
+Monitor AccesoDB{
+    int maxConsultas = 5
+    cond consultaDisponible
+
+    Procedure iniciarConsulta(){
+        while (maxConsultas == 0){ // utilizar while para procesar despues de un signal
+            wait(consultaDisponible) // se duerme 
+        }
+        maxConsultas = maxConsultas - 1
+    }
+
+    Procedure finalizarConsulta(){
+        maxConsultas = maxConsultas + 1
+        signal(consultaDisponible)
+    }
+}
+
+process Lector [l:1..N]{
+    while (true){
+        AccesoDB.iniciarConsulta()
+        // Leer datos de la base de datos
+        AccesoDB.finalizarConsulta()
+    }
+}
