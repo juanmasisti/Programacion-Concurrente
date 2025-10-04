@@ -25,47 +25,223 @@ a la persona cuál fotocopiadora usar y cuándo hacerlo.
 // a) 
 
 Monitor AccesoFotocopiadora {
-    cond cola;
-    int cant= 0;
-
-    Procedure entrarFotocopiadora ()
-        while ( cant > 0) wait (cola);
-        cant = cant + 1;
-    end;
-    Procedure salirFotocopiadora ()
-        cant = cant - 1;
-        signal(cola);
-    end;
+  // No necesita condition ni contadores para (a), ya que no importa el orden
+  // El monitor garantiza exclusión mutua, al ser sólo una persona a la vez se puede usar como un unico procedimiento. 
+  procedure usarFotocopiadora(id) {
+    // entrada al monitor: sólo uno obtiene exclusión
+    Fotocopiar();      // simulación del uso
+    // al salir del procedimiento libera el monitor
+  }
 }
 
-Process Persona [p:1..N]
-    AccesoFotocopiadora. entrarFotocopiadora (p);
-    //usar fotocopiadora
-    AccesoFotocopiadora. salirFotocopiadora(p);
-End Process;
+Process Persona[p:1..N] {
+  AccesoFotocopiadora.usarFotocopiadora(p);
+  // sigue su camino
+}
+
 
 b) 
 Monitor AccesoFotocopiadora {
     cond cola;
-    int cant= 0; // cantidad de personas esperando
+    int esperando= 0; // cantidad de personas esperando
     boolean estaLibre = true;
 
-    Procedure entrarFotocopiadora ()
-        if (estaLibre) then
-            estaLibre = false;
-            else
-            cant = cant + 1;
+    Procedure entrarFotocopiadora (){
+        if (!estaLibre) then
+            esperando++;
             wait(cola);
-    end;
-    Procedure salirFotocopiadora ()
-        cant = cant - 1;
-        signal(cola);
-        if (cant == 0) estaLibre = true;
-    end;
+        else
+            estaLibre = false;
+    }
+
+    Procedure salirFotocopiadora () {
+        if (esperando > 0){
+            esperando--;
+            signal(cola);
+        } else {
+            estaLibre = true;
+        }
+    }
 }
 
-Process Persona [p:1..N]
+Process Persona [p:1..N] {
     AccesoFotocopiadora. entrarFotocopiadora(p);
     //usar fotocopiadora
     AccesoFotocopiadora. salirFotocopiadora(p);
-End Process;
+}
+
+//alternativa con while, rompe orden FIFO
+
+monitor AccesoFotocopiadora {
+  condition cola;
+  boolean estaLibre = true;
+
+  procedure entrarFotocopiadora(id) {
+    while (!estaLibre) wait(cola);
+    // al salir del while, soy yo quien toma la fotocopiadora
+    estaLibre = false;
+  }
+
+  procedure salirFotocopiadora() {
+    estaLibre = true;
+    signal(cola);
+  }
+}
+
+c)
+Monitor AccesoFotocopiadora {
+    cond espera[N]; // vc por cada persona
+    int esperando= 0; // cantidad de personas esperando
+    boolean estaLibre = true;
+    colaOrdenada fila; // estructura de datos para mantener orden por edad
+    int idAux= 0; // id de la persona que está usando la fotocopiadora
+
+    Procedure entrarFotocopiadora (id, edad: int){
+        if (!estaLibre) {
+            insertar(fila, id, edad); // insertar en la fila ordenada por edad
+            esperando++;
+            wait(espera[id]); // se duerme en su vc
+        } else {
+            estaLibre = false;
+        }
+    }
+
+    Procedure salirFotocopiadora () {
+        if (esperando > 0){
+            esperando--;
+            sacar(fila, idAux); // sacar el id de la persona con mayor edad
+            signal(espera[idAux]); // despertar a esa persona
+        } else {
+            estaLibre = true;
+        }
+    }
+}
+
+Process Persona [p:1..N] {
+    AccesoFotocopiadora. entrarFotocopiadora(id, edad);
+    //usar fotocopiadora
+    AccesoFotocopiadora. salirFotocopiadora();
+}
+
+d)
+
+Monitor AccesoFotocopiadora  {
+    cond espera[N]; // vc por cada persona
+    boolean estaLibre = true;
+    int turno = 0; // turno actual
+
+    Procedure entrarFotocopiadora (id: int){
+        if (id != turno) {
+            wait(espera[id]); // se duerme en su vc
+        }
+
+        // no es necesario manejar boolean estaLibre, ya que el orden lo garantiza el turno
+    }
+
+    Procedure salirFotocopiadora () {
+        turno++;
+        signal(espera[turno]); // despertar a la siguiente persona en orden
+    }
+}
+
+Process Persona [p:1..N] {
+    AccesoFotocopiadora. entrarFotocopiadora(id, edad);
+    //usar fotocopiadora
+    AccesoFotocopiadora. salirFotocopiadora();
+}
+
+e)
+
+Monitor AccesoFotocopiadora {
+    cond cola;
+    int esperando= 0; // cantidad de personas esperando
+    cond empleado;
+    cond fin;
+
+    Procedure entrarFotocopiadora (){
+        esperando++;
+        signal(empleado); // avisa al empleado que hay alguien esperando
+        wait(cola);
+    }
+
+    Procedure salirFotocopiadora () {
+        esperando--;
+        signal(fin); // avisa al empleado que terminó
+    }
+
+    Procedure asignar () {
+        if (esperando == 0) {
+            wait(empleado); // espera a que alguien llegue
+          }
+        signal(cola); // permite que una persona use la fotocopiadora
+        wait(fin); // espera a que termine
+    }
+}
+
+Process Empleado {
+  int i;
+  for i = 0..N-1 { // recorre todas las personas
+    AccesoFotocopiadora.asignar(); // asigna a la persona que puede usar la fotocopiadora
+  }
+}
+
+Process Persona [p:1..N] {
+    AccesoFotocopiadora. entrarFotocopiadora(p);
+    //usar fotocopiadora
+    AccesoFotocopiadora. salirFotocopiadora(p);
+}
+
+
+f)
+Process Persona [id:0..N-1]{
+    Documento documento; 
+    Fotocopia fotocopia;
+    Fotocopiadora fotocopiadoraAsig;
+
+    Fotocopiadora.usar(fotocopiadoraAsig);
+    Fotocopia = fotocopiadoraAsig.scan(documento);
+    Fotocopiadora.dejar(fotocopiadoraAsig);
+}
+
+Process Empleado{
+    int i;
+    for i = 0..N-1 {
+        Fotocopiadora.asignar()
+    }
+}
+
+Monitor Fotocopiadora {
+    cola cola;
+    cola fotocopiadoras = {1,2,3,4,5,6,7,8,9,10}; // supondremos 10 fotocopiadoras
+    cond empleado; // para avisar al empleado que hay alguien esperando
+    cond persona[n] = ([n] = 0); // vc por cada persona
+    cond fotocop; // para avisar que hay una fotocopiadora libre
+    int asignada[n] = ([n] = 0); // fotocopiadora asignada a cada persona
+
+    Procedure usar(fotocopiadoraAsig: out int, idP: in int){ // in id de la persona, out fotocopiadora asignada
+       signal(empleado);
+       cola.push(idP); // la persona se pone en la cola de espera
+       wait(persona[idP]); // espera a que el empleado le asigne una fotocopiadora
+       fotocopiadoraAsig = asignada[idP]; // fotocopiadora asignada a la persona
+
+    }
+
+    Procedure dejar(fotocopiadoraAsig: in int){ 
+        fotocopiadoras.push(fotocopiadoraAsig); // libera la fotocopiadora asignada
+        signal(fotocop); // avisa que hay una fotocopiadora libre
+    }
+
+    Procedure asignar(){
+        if (cola.empty()){
+            wait(empleado);
+        }
+        idAux = cola.pop(); // saca el id de la persona que está esperando
+        if (fotocopiadoras.empty()){ // si no hay fotocopiadoras libres, espera
+            wait(fotocop);
+        }
+        asignada[idAux] = fotocopiadoras.pop(); // asigna una fotocopiadora libre a la persona
+        signal(persona[idAux]); // avisa a la persona que ya tiene fotocopiadora asignada
+
+    }
+
+}
