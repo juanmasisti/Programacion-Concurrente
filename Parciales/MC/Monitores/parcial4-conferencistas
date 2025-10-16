@@ -1,0 +1,47 @@
+// Resolver con MONITORES el siguiente problema. En una sala se juntan 20 conferencistas y un coordinador 
+// para una conferencia internacional. Cuando todos han llegado a la sala (los 20 conferencistas y el coordinador) 
+// el coordinador abre la sesión con una presentacion de 30 minutos, y luego cada conferencistas realiza
+// su presentación de 10 minutos, de a uno a la vez y de acuerdo al orden que llegaron a la sala. Cuando todas las 
+// presentaciones terminaron, las personas (conferencistas y coordinador) se retiran.
+
+Process conferencista [c: 0..19] {
+    Sala.esperarTurno();
+    // hace presentacion de 10 minutos
+    delay(10);
+    Sala.terminar();
+}
+
+Process coordinador {
+    Sala.esperarInicio();
+    // hace presentacion de 30 minutos
+    delay(30);
+    Sala.terminar();
+}
+
+Monitor Sala{
+    int cant, terminaron = 0; // para contar la cantidad de personas que llegaron y las que terminaron
+    cond esperaCoordinador, espera, esperaFin; // cola de espera para el coordinador, para los conferencistas y para el final
+
+    Procedure esperarInicio(){
+        if (cant < 20)
+            wait(esperaCoordinador); // si no llegaron todos, la persona espera
+    }
+
+    Procedure esperarTurno(){
+        cant++;
+        if (cant == 20) // si llegaron todos, aviso al coordinador
+            signal(esperaCoordinador);
+        wait(espera); // espera a que inice el coordinador
+    }
+
+    Procedure terminar(){
+        terminaron++;
+        if (terminaron == 21) // si terminaron todos, aviso a los que están esperando para irse
+            signal_all(esperaFin);
+        else 
+            signal(espera); // aviso al siguiente conferencista que puede presentar
+            wait(esperaFin); // espera a que terminen todos para irse
+            
+    }
+}
+

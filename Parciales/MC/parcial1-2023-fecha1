@@ -1,0 +1,72 @@
+// Resolver con SEMÁFOROS el siguiente problema. Para un experimento se tiene una red con 15 controladores de temperatura y dos módulos centrales.
+// Los controladores cada cierto tiempo toman la temperatura mediante la funcion medir() y la envía para que alguna de las centrales le indique que debe hacer
+// (numero de 1 a 10), y luego realiza esa accion mediante la funcion actuar() para determinar la accion que deberá hacer ese controlador (numero de 1 a 10).
+// Nota: el tiempo que espera cada controlador para tomar nuevamente la temperatura empieza a contar después de haber ejecutado la funcion actuar().
+
+
+sem mutex = 1; // semáforo para proteger la cola
+sem espera[15] = ([15], 0); // array de semáforos para que cada controlador espere su turno
+Cola c; // cola para manejar el orden de llegada
+sem hayPedido = 0; // semáforo para indicar que hay un pedido de un controlador
+int vecAcciones[15]; // array para guardar las acciones que debe hacer cada controlador
+
+Process controlador [id: 0..14]{
+    int accion;
+    while (true){
+        double temp = medir(); // mide la temperatura
+        P(mutex);
+        c.push(id, temp); // encolar el controlador
+        V(mutex);
+        V(hayPedido); // aviso a la central que hay un pedido
+        P(espera[id]); // espera a ser atendido por una central
+        actuar (vecAcciones[id]); // realiza la accion indicada por la central
+    }
+}
+
+Process central [id: 0..1]{
+    int idControlador;
+    double temp;
+    while (true){
+        P(hayPedido);
+        P(mutex);
+        c.pop(idControlador, temp); // desencolar el controlador
+        V(mutex);
+        // procesa la temperatura y determina la accion a realizar
+        vecAcciones[idControlador] = determinar(temp);
+        V(espera[idControlador]); // despierto al controlador para que realice la accion
+    }
+}
+
+// Resolver con MONITORES la siguiente situacion. En un camino turistico hay un puente por donde puede pasar un vehiculo a la vez.
+// Hay N autos que deben pasar por él de acuerdo con el orden de llegada. Nota: solo se puede usar los procesos Autos (y los monitores que sean necesarios);
+// suponga que existe la funcion pasar() que simula el paso del auto por el puente.
+
+Process auto [id: 0..N-1]{
+    Puente.esperar(id);
+    pasar();
+    Puente.terminarPaso();
+}
+
+Monitor Puente {
+    cond espera;
+    int cant = 0; // para contar la cantidad de autos esperando
+    bool libre = true; // para saber si el puente está libre
+
+    Procedure esperar(){
+        if (libre) {
+            libre = false
+        } else {
+            cant++;
+            wait(espera); // el auto espera a ser atendido
+        }
+    }
+
+    Procedure terminarPaso(){
+        if (cant > 0){
+            cant--;
+            signal(espera); // si hay autos esperando, dejo pasar al siguiente
+        } else {
+            libre = true; // si no hay autos esperando, el puente queda libre
+        }
+    }
+}

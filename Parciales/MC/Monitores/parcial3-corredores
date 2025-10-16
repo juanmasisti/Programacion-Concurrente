@@ -1,0 +1,49 @@
+// Resolver con MONITORES el siguiente problema. Se debe simular una carrera a campo traviesa
+// con C corredores, donde en la mitad del recorrido hay un puente colgante que puede ser usado 
+// por una única persona a la vez. Cuando los C corredores han llegado al punto de partida 
+// comienza la carrera. Cuando un corredor llega al puente espera su turno (respetando el orden de llegada al mismo)
+// y lo cruza (suponga que tarda un par de minutos en cruzarlo); y luego continua su carrera hasta llegar a la meta. 
+// Nota: cada corredor pasa sólo una vez por el puente. Solo se puede usar procesos que representes a los corredores. 
+Process corredor [c: 0..C-1] {
+    Largada.esperarInicio();
+    // correr hasta el puente
+    AdminPuente.solicitar();
+    // cruzar puente
+    delay(120); // demora en cruzar el puente
+    AdminPuente.salir();
+    // correr hasta la meta
+}
+
+Monitor Largada {
+    cantidad = 0; // para contar la cantidad de corredores que llegaron
+    cond espera; // cola de espera para los corredores
+    
+    Procedure esperarInicio(){
+        cantidad++;
+        if (cantidad < C-1)// si no llegaron todos, el corredor espera
+            wait(espera);
+        else signal_all(espera); // despierto a todos los corredores que están esperando
+    }
+}
+
+Monitor AdminPuente {
+    bool libre = true;
+    cond espera; // cola de espera para los corredores
+    int cant = 0; // para contar la cantidad de corredores esperando
+
+    procedure solicitar(){ // cuando se termina este proceso es: si bien el acceso estaba libre, o porque se durmió y alguien lo despertó
+        if (libre) libre = false; // si el puente está libre, el corredor puede pasar
+        else {
+            cant++; // se incrementa antes de esperar, para que los otros corredores lo vean
+            wait(espera); // si no está libre, el corredor espera
+        }
+    }
+
+    procedure salir(){
+        if (cant > 0){ // si hay corredores esperando, dejo pasar al siguiente
+            cant--;
+            signal(espera); // si hay corredores esperando, dejo pasar al siguiente
+        }
+        else libre = true; // si no hay corredores esperando, el puente queda libre
+    }
+}

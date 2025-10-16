@@ -1,0 +1,114 @@
+// Resolver con SEMAFOROS el siguiente problema. Se tiene un vector A de 1.000.000 de caracteres, del cual
+// se debe obtener la cantidad de veces que aparecen los caracteres "F" y "C", utilizando 4 procesos Worker.
+// Al terminar todos los procesos deben imprimir la cantidad de veces que aparece cada una de esas dos letras (F y C).
+// Nota: maximizar la concurrencia, unicamente se pueden usar los 4 procesos Worker.
+
+    char vector[1000000]; // vector de 1.000.000 de caracteres
+    int cantDivididos = 1000000 / 4; // cantidad de caracteres que debe procesar cada Worker
+    int sumaF = 0, sumaC = 0; // contadores locales para cada Worker
+    sem mutexF = 1; // semáforo para proteger la variable global cantF
+    sem mutexC = 1; // semáforo para proteger la variable global cantC
+    sem barrera = 1; // semáforo para la barrera
+    sem espero = 0; // semáforo para esperar a que todos los Workers terminen
+
+    process Worker[id:0..3]{
+        int i;
+        int ini = id * cantDivididos; // índice inicial para cada Worker
+        int fin = cantDivididos + ini - 1; // índice final para cada Worker
+        int sumaAuxF = 0, sumaAuxC = 0, cant = 0; // contadores auxiliares para cada Worker
+
+        for i = ini..fin{
+            if (vector[i] == 'F') sumaAuxF++;
+            else if (vector[i] == 'C') sumaAuxC++;
+        }
+        P(mutexF);
+        sumaF += sumaAuxF; // actualizar contador global de F
+        V(mutexF);
+        P(mutexC);
+        sumaC += sumaAuxC; // actualizar contador global de C
+        V(mutexC);
+        P(barrera);
+        cant++;
+        if (cant == 4)
+            for i = 0..3
+                V(espero); // liberar a todos los Workers
+        V(barrera);
+        P(espero); // esperar a que todos los Workers terminen
+        write("Cantidad de F: ", sumaF);
+        write("Cantidad de C: ", sumaC);
+    }
+
+// Resolver con SEMAFOROS el siguiente problema. Existen B barcos areneros que deben descargar su contenido en una
+// playa. Los barcos se descargan de a uno por vez, y de acuerdo con orden de llegada. Una vez que el barco llego,
+// espera a que le llegue su turno para comenzar a descargar su contenido, y luego se retira. Nota: solo se pueden
+// usar los procesos que representen a los barcos; cada barco descarga solo una vez; suponga que existe la funcion DESCARGAR() 
+// que simula que el barco esta descargando su contenido en la playa.
+
+sem mutex = 1; // semáforo para proteger la cola
+sem espera[B] = ([B], 0); // array de semáforos para que cada barco espere su turno
+bool libre = true; // para saber si la playa está libre
+Cola c; // cola para manejar el orden de llegada
+
+process barco[id:0..B-1]{
+    P(mutex);
+    if (libre) {
+        libre = false; // si la playa está libre, el barco puede descargar
+        V(mutex);
+    } else {
+        c.push(id); // encolar el barco
+        V(mutex);
+        P(espera[id]); // si no está libre, el barco espera su turno
+    }
+    DESCARGAR(); // simula la descarga del barco
+    P(mutex);
+    if (!c.empty()){
+        int next = c.pop();
+        V(espera[next]); // si hay barcos esperando, dejo pasar al siguiente
+    } else {
+        libre = true; // si no hay barcos esperando, la playa queda libre
+    }
+    V(mutex);
+}
+
+// Resolver con MONITORES el siguiente problema. En una acopiadora de cereales hay 2 empleados, uno para atender a los camiones de maiz 
+// y otro para los de girasol. Hay 30 camiones que llegan para descargar su carga (15 de maiz y 15 de girasol), cuando el camion llega
+// espera hasta que el empleado correspondiente le avise que puede descargar el cereal. Cada empleado hace descargar los camiones que 
+// le corresponden de a uno a la vez y de acuerdo con orden de llegada. Nota: maximizar la concurrencia; el camion sabe que tipo de cereal 
+// lleva; todos los procesos deben terminar. 
+
+Process camion [id: 0..29] {
+    int tipo; // cada camion sabe si lleva maiz o girasol
+    Acopiadora[tipo].esperar();
+    // descargar cereal
+    Acopiadora[tipo].terminarDescarga(); // simula la descarga del camion
+}
+
+Process empleado [em: 0..1] { // 0 para maiz, 1 para girasol
+    for i = 0..14{
+        Acopiadora[em].siguiente();
+    }
+}
+
+Monitor Acopiadora[0..1] { // 0 para maiz, 1 para girasol
+    cond espera;
+    cond fin;
+    cond empleado;
+    int cant = 0; // para contar la cantidad de camiones esperando
+
+    Procedure esperar(){
+        cant++;
+        signal(empleado); // aviso al empleado que hay un camion esperando
+        wait(espera); // el camion espera a ser atendido por el empleado
+    }
+
+    Procedure terminarDescarga(){
+        signal(fin); // aviso al empleado que terminé de descargar
+    }
+
+    Procedure siguiente(){
+        if (cant == 0) wait (empleado); // si no hay camiones esperando, el empleado espera
+        cant--;
+        signal(espera); // despierto al siguiente camion en espera
+        wait(fin); // espero a que el camion termine de descargar
+    }
+}

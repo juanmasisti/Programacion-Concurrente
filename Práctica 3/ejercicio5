@@ -1,0 +1,73 @@
+// 5.  En un corralón de materiales se deben atender a N clientes de acuerdo con el orden de llegada. 
+// Cuando  un  cliente  es  llamado  para  ser  atendido,  entrega  una  lista  con  los  productos  que 
+// comprará, y espera a que alguno de los empleados le entregue el comprobante de la compra 
+// realizada. 
+// a) Resuelva considerando que el corralón tiene un único empleado. 
+// b) Resuelva considerando que el corralón tiene E empleados (E > 1). Los empleados no 
+// deben terminar su ejecución. 
+// c) Modifique la solución (b) considerando que los empleados deben terminar su ejecución 
+// cuando se hayan atendido todos los clientes. 
+
+a)
+Process cliente [c: 1..N] {
+    text lista;
+    text comprobante;
+
+    Corralon.llegada(lista, comprobante);
+    
+}
+
+Process empleado {
+    text lista;
+    text comprobante;
+    int j;
+
+    for j = 0..N-1{
+        Corralon.obtenerLista(lista);
+        // preparar comprobante
+        Corralon.dejarComprobante(comprobante);
+
+    }
+}
+
+Monitor Corralon {
+    text listaC;
+    text compE;
+    cond empleado; // cola de espera para el empleado
+    cond recibiCompr; // para avisar que el comprobante está listo
+    cond cliente; // cola de espera para los clientes
+    cond datos; // cola de espera para los datos
+    cond atencion; // para avisar que el empleado está atendiendo
+    bool libre = true;
+    int esperando = 0;
+
+    Procedure llegada(lista: in text, comprobante: out text) {
+        signal(empleado); // aviso al empleado que hay un cliente esperando
+        esperando++;
+        wait(cliente); // espero a que el empleado me atienda
+        listaC = lista;
+        signal(datos); // aviso al empleado que ya tiene los datos
+        wait(atencion); // espero a que el empleado termine de atenderme
+        comprobante = compE; // para la entrega del comprobante al cliente, por output
+        esperando--; // un cliente menos en espera
+        signal(recibiCompr); // aviso al empleado que ya tomé mi comprobante
+    }    
+
+    Procedure obtenerLista(lista: out text){
+        if (esperando == 0){ // si no hay clientes esperando, el empleado espera
+            wait(empleado);
+        }
+        signal(cliente); // despierto al siguiente cliente en espera
+        wait(datos); // espero a que el cliente me dé la lista
+        lista = listaC;
+    }
+
+    Procedure dejarComprobante(compr: in text){
+        compE = compr;
+        signal(atencion); // aviso al cliente que ya terminé de atenderlo
+        wait(recibiCompr); // espero a que el cliente tome su comprobante
+    }
+
+}
+
+

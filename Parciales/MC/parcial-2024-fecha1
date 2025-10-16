@@ -1,0 +1,44 @@
+// Se debe simular el uso de un sistema virtual de venta de entradas para un enveto musical.
+// El sistema cuenta con C cajeros virutales que atienden indefinidamente. Sin embargo, como la venta 
+// de entradas comienza a una hora determinada, solo atienden a partir del aviso de un Timer. Una vez que 
+// reciben dicho aviso, los cajeros atienden de acuerdo con el orden de llegada de los compradores. La atencion
+// consiste en recibir la solicitud del comprador (datos para el pago) y responderle si pudo comprar (o no) junto
+// al comprobante de la operacion. Para este evento se cuenta con E entradas y N compradores, donde cada comprador puede 
+// solicitar a lo sumo una entrada. Resuelva usando SEMÁFOROS.
+
+sem mutex = 1; // semáforo para proteger la cola
+sem vendedor[C] = ([C], 0); // array de semáforos para que cada comprador espere su turno
+sem esperaCompra[N] = ([N], 0); // array de semáforos para que cada comprador espere a ser atendido
+Cola c; // cola para manejar el orden de llegada
+bool compras[N]; // array para saber si un comprador ya compró o no
+int cantEntradas = E; // contador de entradas disponibles
+
+Process comprador [c: 0..N-1] {
+    text datosPago;
+    bool exito;
+    text solicitud,comprobante;
+    P(mutex);
+    c.push(c); // encolar el comprador 
+    V(mutex);
+    P(esperaCompra[c]); // esperar a ser atendido por un cajero
+    Sistema.llegada(datosPago, exito, comprobante);
+    
+}
+
+Process cajero [id: 0..C-1] {
+    text datosPago;
+    bool exito;
+    text comprobante;
+    int j;
+
+    while (true){
+        Sistema.atender(datosPago, exito, comprobante);
+        // procesar pago
+    }
+}
+
+
+Process Sistema {
+    // esperar hasta la hora de inicio de la venta
+    Sistema.iniciarVenta();
+}

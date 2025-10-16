@@ -1,0 +1,44 @@
+//4.  Existen  N  vehículos  que  deben  pasar  por  un  puente  de  acuerdo  con  el  orden  de  llegada.  
+//Considere que el puente no soporta más de 50000kg y que cada vehículo cuenta con su propio 
+// peso (ningún vehículo supera el peso soportado por el puente).
+
+Respuesta:
+
+Process vehiculo [v: 1..N] {
+    int pesoVehiculo;
+    Puente.entrar(pesoVehiculo);
+    // cruzar puente
+    Puente.salir(pesoVehiculo);
+}
+
+Monitor Puente {
+    int pesoActual = 0;
+    cond auto; // cola de espera para los vehículos
+    cond pesoAdecuado; // para avisar que hay peso disponible
+    bool libre = true;
+    int esperando = 0;
+
+    Procedure entrar(pesoVehiculo: in int) {
+        if (!libre) {
+            esperando++;
+            wait(auto);
+        } else {
+            libre = false;
+        }
+        while (pesoActual + pesoVehiculo > 50000) {
+            wait(pesoAdecuado); // espero a que haya peso disponible
+        }
+        pesoActual += pesoVehiculo; // el vehículo entra al puente
+        if (esperando > 0){ // si hay vehículos esperando, dejo pasar al siguiente
+            esperando--; // un vehículo menos en espera
+            signal(auto); // aviso al siguiente vehículo en espera
+        }
+        else {
+            libre = true; // si no hay vehículos esperando, el puente queda libre
+        }
+    }
+
+    Procedure salir(pesoVehiculo: in int) {
+        pesoActual -= pesoVehiculo;
+        signal(pesoAdecuado); // despierto al siguiente vehículo que esté esperando, y vuelve a comprobar el peso
+}

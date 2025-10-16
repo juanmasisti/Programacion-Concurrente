@@ -1,0 +1,51 @@
+// Resolver con MONITORES el siguiente problema. Simular el uso de un puente de un solo carril y 
+// sentido por donde puede pasar un vehiculo a la vez. Hay N vehículos donde algunos son autos y otros ambulancias.
+// Los vehículos deben pasar de acuerdo al orden de llegada pero siempre dando prioridad a las ambulancias. 
+// Nota: suponga que cada vehículo tarda 5 minutos en pasar por el puente.
+Process vehiculo [id: 0..N-1] {
+    bool esAmbulancia; // cada vehículo sabe si es ambulancia o no
+    if (esAmbulancia) Admin.pasoAmbulancia();
+    else Admin.pasoAuto();
+    // cruzar puente
+    delay(300);
+    Admin.salir();
+}
+
+Monitor Admin {
+    bool libre = true; // para saber si el puente está libre
+    int cantAmbulancias = 0; // para saber cuántas ambulancias están esperando
+    int cantAutos = 0; // para saber cuántos autos están esperando
+    cond esperaAmbulancia; // cola de espera para las ambulancias
+    cond esperaAuto; // cola de espera para los autos
+    // 2 vc separadas para manejar la prioridad
+
+    procedure pasoAmbulancia(){
+        if (libre){
+            libre = false; // si el puente está libre, la ambulancia puede pasar
+        } else {
+            cantAmbulancias++; // se incrementa antes de esperar, para que los otros vehículos lo vean
+            wait(esperaAmbulancia); // si no está libre, la ambulancia espera
+        }
+    }
+
+    procedure pasoAuto(){
+        if (libre){ 
+            libre = false;
+        } else {
+            cantAutos++; // se incrementa antes de esperar, para que los otros vehículos lo vean
+            wait(esperaAuto); // si no está libre el auto espera
+        }
+    }
+    
+    procedure salir(){
+        if (cantAmbulancias >0){
+            cantAmbulancias--;
+            signal(esperaAmbulancia); // si hay ambulancias esperando, dejo pasar a la siguiente
+        } else if (cantAutos >0){
+            cantAutos--;
+            signal(esperaAuto); // si no hay ambulancias pero hay autos, dejo pasar al siguiente auto
+        } else {
+            libre = true; // si no hay vehículos esperando, el puente queda libre
+        }
+    }
+}
