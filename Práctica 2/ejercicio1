@@ -5,6 +5,8 @@
 // b. Implemente una solución que modele el acceso de las personas a un detector 
 // (es decir, si el detector está libre la persona lo puede utilizar; en caso contrario, debe esperar).
 // c. Modifique su solución para el caso que haya tres detectores.
+// d. Modifique la solución anterior para el caso en que cada persona pueda pasar más de 
+// una vez, siendo aleatoria esa cantidad de veces.
 
 //a y b.
 
@@ -22,4 +24,15 @@ process persona[i:0..N-1]{
     P(mutex)
     //Usar detector
     V(mutex)
+}
+
+// d.
+sem mutex = 3;
+process persona[i:0..N-1]{
+    int veces = random(1,N); // Cada persona puede pasar entre 1 y n veces. 
+    for j = 1 to veces {
+        P(mutex)
+        //Usar detector
+        V(mutex)
+    }
 }

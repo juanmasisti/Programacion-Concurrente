@@ -8,29 +8,38 @@
 a)
 //Procesos: N procesos lectores
 //Recursos: Motor de base de datos (con un límite de 5 consultas simultáneas)
-//Monitores/Sincronizaciones: Monitor de acceso a la base de datos
+//Monitores/Sincronizaciones: Monitor de administracion de acceso a la base de datos, con proceso para entrar y salir del monitor, y una variable para contar el número de consultas simultáneas.
 
-Monitor AccesoDB{
-    int maxConsultas = 5
-    cond consultaDisponible
+b)
+Monitor AccesoDB {
+    int cantMax = 5; // Cantidad máxima de consultas simultáneas
+    cond consultaDisponible; // variable condicion para dormir procesos cuando se alcance el límite
 
-    Procedure iniciarConsulta(){
-        while (maxConsultas == 0){ // utilizar while para procesar despues de un signal
-            wait(consultaDisponible) // se duerme 
+    Procedure iniciarConsulta( {
+        while (cantMax == 0) { // utilizar while para procesar despues de un signal
+            wait(consultaDisponible);
         }
-        maxConsultas = maxConsultas - 1
-    }
+        cantMax--;
+    }) 
 
-    Procedure finalizarConsulta(){
-        maxConsultas = maxConsultas + 1
-        signal(consultaDisponible)
+    Procedure finalizarConsulta() {
+        cantMax++; // Incrementar el contador de consultas
+        signal(consultaDisponible); // Despertar a un proceso que esté esperando
     }
 }
 
-process Lector [l:1..N]{
-    while (true){
-        AccesoDB.iniciarConsulta()
-        // Leer datos de la base de datos
-        AccesoDB.finalizarConsulta()
-    }
+Process Lector [1..N] {
+    AccesoDB.iniciarConsulta(); // Solicitar acceso a la base de datos
+    // Leer información de la base de datos
+    AccesoDB.finalizarConsulta(); // Liberar el acceso a la base de datos
 }
+
+// Notas:
+// Si el monitor encapsula el recurso (Ej. 1 - Puente): Ponés la acción de usar el recurso adentro del procedimiento. 
+// La exclusión mutua está garantizada implícitamente porque los procedimientos en el mismo monitor no ejecutan concurrentemente. 
+// Esto es útil cuando el recurso físico admite a lo sumo 1 usuario a la vez.
+
+// Si el monitor es el administrador/puerta (Ej. 2 - Base de Datos): Como el motor admite hasta 5 consultas en paralelo, 
+// si metías la lectura a la base de datos adentro del procedimiento del monitor, la exclusión mutua implícita iba a forzar a que las consultas 
+// se hicieran de a 1 por vez, arruinando la concurrencia. Al separar el acceso en iniciarConsulta() y finalizarConsulta() y leer la BD afuera, 
+// lográs que 5 procesos activos estén interactuando concurrentemente en la base de datos tras haber pasado por el monitor pasivo.

@@ -14,7 +14,7 @@
 
 a)
 Paquete c[N]; // cola de contenedores, donde cada posición puede almacenar un paquete
-sem vacio = 1; // indica si hay espacio en la cola
+sem vacio = N; // representa la cantidad de contenedores vacíos, el semáforo de vacíos debe iniciar en N para aprovechar toda la concurrencia?
 sem lleno = 0; // indica si hay paquetes en la cola
 
 Process preparador {
@@ -37,9 +37,9 @@ Process entregador {
 
 b)
 Paquete c[N];
-sem vacio = N; // al tener P preparadores, el semáforo de vacíos debe iniciar en N para aprovechar toda la concurrencia?
+sem vacio = N; 
 sem lleno = 0;
-sem mutexP = 1;
+sem mutexP = 1; // al tener P preparadores, es necesario un mutex para proteger el acceso a la cola de contenedores
 
 Process preparador[i:0..P-1] {
     while (true){
@@ -63,9 +63,9 @@ Process entregador {
 
 c)
 Paquete c[N];
-sem vacio = N; // al tener E entregadores, el semáforo de vacíos debe iniciar en N para aprovechar toda la concurrencia?
+sem vacio = N; 
 sem lleno = 0;
-sem mutexE = 1;
+sem mutexE = 1; // al tener E entregadores, es necesario un mutex para proteger el acceso (pop) a la cola de contenedores
 
 Process preparador {
     while (true){
@@ -89,10 +89,10 @@ Process entregador[i:0..E-1] {
 
 d)
 Paquete c[N];
-sem vacio = N; // al tener P preparadores y E entregadores, el semáforo de vacíos debe iniciar en N para aprovechar toda la concurrencia?
+sem vacio = N; 
 sem lleno = 0;
-sem mutexP = 1;
-sem mutexE = 1;
+sem mutexP = 1; // al tener P preparadores, es necesario un mutex para proteger el acceso (push) a la cola de contenedores
+sem mutexE = 1; // al tener E entregadores, es necesario un mutex para proteger el acceso (pop) a la cola de contenedores, no se puede usar el mismo mutex que para los preparadores porque ambos procesos pueden acceder a la cola al mismo tiempo
 
 Process preparador[i:0..P-1] {
     while (true){

@@ -19,9 +19,9 @@ Monitor Puente
 End Monitor;
 
 Process Auto [a:1..M]
-    Puente. entrarPuente (a);
+    Puente.entrarPuente(a);
     “el auto cruza el puente”
-    Puente. salirPuente(a);
+    Puente.salirPuente(a);
 End Process;
 
 // a. ¿El código funciona correctamente? Justifique su respuesta.
@@ -55,3 +55,15 @@ Process Auto [a:1..M]{
 // c. No, no lo respeta, ya que cuando un auto se despierta (despierta al primero que se durmió), pasa a competir con el resto de autos para pasar al puente. 
 // No hay garantía del orden de llegada a menos que se programe explícitamente
 // La b. tampoco lo respeta ya que todos los autos van a competir por el uso del monitor.
+
+// Dudas resueltas:
+// ¿Le puede "robar" el control un auto que recién llega?
+//  Sí, absolutamente. En la disciplina Signal and Continue (la que usa la materia), 
+//  cuando el auto que está saliendo hace signal(cola), el auto dormido se "despierta", pero no entra inmediatamente al monitor.
+//  Pasa de estar en la "cola de dormidos" a la "cola de entrada principal", poniéndose a competir a la par de cualquier auto nuevo que acabe de llegar en ese exacto milisegundo. 
+//  Si el auto nuevo es más rápido (por políticas del sistema operativo), le gana la entrada al monitor.
+
+// While vs If:
+// Si hubiera programado el código usando if (cant > 0) wait(cola), cuando el Auto 2 (auto que recien estaba tratando de acceder por primera vez)entraba al monitor 
+// después de que le robaran el lugar, 
+// habría seguido de largo (porque no volvería a preguntar) y ¡habría dos autos en el puente al mismo tiempo! El while es tu escudo protector contra los procesos "ladrones".

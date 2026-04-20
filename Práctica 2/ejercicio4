@@ -31,7 +31,7 @@ Process Usuario-Alta [I:1..L]::
 
 // Respuesta:
 Están mal declaradas las variables, deberían estar:
-sem sem = 6;
+sem total = 6;
 sem alta = 4;
 sem baja = 5;
 La restricción “total ≤ 6” se cumple porque nadie puede entrar sin P(sem) y sem inicia en 6. OK.

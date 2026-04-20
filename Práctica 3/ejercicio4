@@ -15,7 +15,7 @@ Monitor Puente {
     int pesoActual = 0;
     cond auto; // cola de espera para los vehículos
     cond pesoAdecuado; // para avisar que hay peso disponible
-    bool libre = true;
+    bool libre = true; // acá indica si la ENTRADA está libre para que el auto pase a evaluar su peso
     int esperando = 0;
 
     Procedure entrar(pesoVehiculo: in int) {
@@ -28,10 +28,10 @@ Monitor Puente {
         while (pesoActual + pesoVehiculo > 50000) {
             wait(pesoAdecuado); // espero a que haya peso disponible
         }
-        pesoActual += pesoVehiculo; // el vehículo entra al puente
-        if (esperando > 0){ // si hay vehículos esperando, dejo pasar al siguiente
-            esperando--; // un vehículo menos en espera
-            signal(auto); // aviso al siguiente vehículo en espera
+        pesoActual += pesoVehiculo; // al salir del while, el vehículo ya tiene permitido pasar, entonces sumo su peso al peso actual del puente
+        if (esperando > 0){ // si hay vehículos esperando, el puente sigue ocupado, pero se le da paso al siguiente vehículo que esté esperando
+            esperando--; 
+            signal(auto); // despierto al siguiente vehículo que esté esperando, y vuelve a comprobar el peso
         }
         else {
             libre = true; // si no hay vehículos esperando, el puente queda libre
@@ -41,4 +41,5 @@ Monitor Puente {
     Procedure salir(pesoVehiculo: in int) {
         pesoActual -= pesoVehiculo;
         signal(pesoAdecuado); // despierto al siguiente vehículo que esté esperando, y vuelve a comprobar el peso
+    }
 }

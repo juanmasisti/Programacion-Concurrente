@@ -22,9 +22,9 @@ Process alumno[i:0..49]{
     P(mutex);
     tarea = elegir();
     contador++;
-    if (contador == 50){
+    if (contador == 50){ // si soy el último alumno en elegir, libero la barrera para que los alumnos puedan comenzar a realizar la tarea
         for j = 1..50 -> V(barreraAlumnos);
-    }
+    } // el último alumno se "auto-habilita" el paso al haber cargado el semáforo con 50 permisos previamente.
     V(mutex);
     P(barreraAlumnos);
     //realizar tarea
@@ -40,13 +40,13 @@ Process profesor{
     int puntaje=10; int contadorTarea[10] = ([10] 0); int j; int tarea; int i;
     for j = 1..50{
         P(despiertoMaestro);
-        P(mutex);
+        P(mutex); // necesario al haber un solo proceso profesor que accede a la cola?
         tarea = finalizadas.pop();
         V(mutex);
         contadorTarea[tarea]++;
-        if (contadorTarea[tarea] == 5){
-            puntajeTarea[tarea] = puntaje;
-            for i = 1..5 -> V(seDioPuntaje[tarea]);
+        if (contadorTarea[tarea] == 5){ // si el profesor detecta que el contador local llegó a 5 (es decir, los 5 miembros de ese grupo ya entregaron), entra al if
+            puntajeTarea[tarea] = puntaje; // asigna el puntaje a ese grupo
+            for i = 1..5 -> V(seDioPuntaje[tarea]); // iterar y despertar a los 5 miembros del grupo correspondiente para que puedan leer su puntaje
             puntaje--;
         }
     }
