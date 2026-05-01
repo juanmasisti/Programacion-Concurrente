@@ -1,73 +1,116 @@
-// 5.  En un corralón de materiales se deben atender a N clientes de acuerdo con el orden de llegada. 
-// Cuando  un  cliente  es  llamado  para  ser  atendido,  entrega  una  lista  con  los  productos  que 
-// comprará, y espera a que alguno de los empleados le entregue el comprobante de la compra 
-// realizada. 
-// a) Resuelva considerando que el corralón tiene un único empleado. 
-// b) Resuelva considerando que el corralón tiene E empleados (E > 1). Los empleados no 
-// deben terminar su ejecución. 
-// c) Modifique la solución (b) considerando que los empleados deben terminar su ejecución 
-// cuando se hayan atendido todos los clientes. 
+// 5. Existe una comisión de 50 alumnos que deben realizar tareas de a pares, las cuales son
+// corregidas por un JTP. Cuando los alumnos llegan, forman una fila. Una vez que están todos
+// en fila, el JTP les asigna un número de grupo a cada uno. Para ello, suponga que existe una
+// función AsignarNroGrupo() que retorna un número “aleatorio” del 1 al 25. Cuando un alumno
+// ha recibido su número de grupo, comienza a realizar su tarea. Al terminarla, el alumno le avisa
+// al JTP y espera por su nota. Cuando los dos alumnos del grupo completaron la tarea, el JTP
+// les asigna un puntaje (el primer grupo en terminar tendrá como nota 25, el segundo 24, y así
+// sucesivamente hasta el último que tendrá nota 1). Nota: el JTP no guarda el número de grupo
+// que le asigna a cada alumno.
 
-a)
-Process cliente [c: 1..N] {
-    text lista;
-    text comprobante;
+Process Alumno [id: 0..49] {
+    int miGrupo, miNota;
 
-    Corralon.llegada(lista, comprobante);
+    Examen.Llegada(id, miGrupo);
     
+    // Realiza la tarea (afuera del monitor para permitir concurrencia)
+    
+    Examen.Entregar(miGrupo, miNota);
 }
 
-Process empleado {
-    text lista;
-    text comprobante;
-    int j;
+Process JTP {
+    int idAlum, grupoAAsignar;
+    int grupoListo, notaActual = 25;
 
-    for j = 0..N-1{
-        Corralon.obtenerLista(lista);
-        // preparar comprobante
-        Corralon.dejarComprobante(comprobante);
+    // Etapa 1: Esperar y Asignar
+    Examen.EsperarFila(); 
 
+    for i = 1 to 50 {
+        Examen.AsignarGrupo(idAlum);
+        grupoAAsignar = AsignarNroGrupo(); // Llamada a la función externa dada
+        Examen.LiberarAlumno(idAlum, grupoAAsignar);
+    }
+
+    // Etapa 2: Esperar entregas y Corregir
+    for i = 0 to 24 { // Son 25 grupos en total
+        Examen.SiguienteACorregir(grupoListo);
+        Examen.PonerNota(grupoListo, notaActual);
+        notaActual--; // El primer grupo recibe 25, el segundo 24...
     }
 }
 
-Monitor Corralon {
-    text listaC;
-    text compE;
-    cond empleado; // cola de espera para el empleado
-    cond recibiCompr; // para avisar que el comprobante está listo
-    cond cliente; // cola de espera para los clientes
-    cond datos; // cola de espera para los datos
-    cond atencion; // para avisar que el empleado está atendiendo
-    bool libre = true;
-    int esperando = 0;
+Monitor Examen {
+    // --- Estructuras Etapa 1 ---
+    int llegados = 0;
+    cola filaAlumnos;
+    cond vcJTP;
+    cond esperaAlumno[50];
+    int grupos[50] = ([50] -1); // Inicializado en -1 para chequeo seguro
 
-    Procedure llegada(lista: in text, comprobante: out text) {
-        signal(empleado); // aviso al empleado que hay un cliente esperando
-        esperando++;
-        wait(cliente); // espero a que el empleado me atienda
-        listaC = lista;
-        signal(datos); // aviso al empleado que ya tiene los datos
-        wait(atencion); // espero a que el empleado termine de atenderme
-        comprobante = compE; // para la entrega del comprobante al cliente, por output
-        esperando--; // un cliente menos en espera
-        signal(recibiCompr); // aviso al empleado que ya tomé mi comprobante
-    }    
+    // --- Estructuras Etapa 2 ---
+    int cantEntregas[25] = ([25] 0); // Posiciones 0 a 24 para los grupos
+    cola gruposListos;
+    cond vcJTPCorrigiendo;
+    cond esperaNota[25];
+    int notas[25] = ([25] -1); // Inicializado en -1 para chequeo seguro
 
-    Procedure obtenerLista(lista: out text){
-        if (esperando == 0){ // si no hay clientes esperando, el empleado espera
-            wait(empleado);
+    // ==========================================
+    // MÉTODOS DE ETAPA 1
+    // ==========================================
+    Procedure Llegada(id: in int, nroGrupo: out int) {
+        llegados++;
+        filaAlumnos.push(id);
+        if (llegados == 50) {
+            signal(vcJTP); // El último en la fila despierta al JTP
         }
-        signal(cliente); // despierto al siguiente cliente en espera
-        wait(datos); // espero a que el cliente me dé la lista
-        lista = listaC;
+        
+        while (grupos[id] == -1) {
+            wait(esperaAlumno[id]); // Duerme en su condición privada
+        }
+        nroGrupo = grupos[id];
     }
 
-    Procedure dejarComprobante(compr: in text){
-        compE = compr;
-        signal(atencion); // aviso al cliente que ya terminé de atenderlo
-        wait(recibiCompr); // espero a que el cliente tome su comprobante
+    Procedure EsperarFila() {
+        if (llegados < 50) {
+            wait(vcJTP); // JTP espera a que se forme la fila de 50
+        }
     }
 
+    Procedure AsignarGrupo(id: out int) {
+        id = filaAlumnos.pop(); // JTP pide el ID del próximo en la fila
+    }
+
+    Procedure LiberarAlumno(id: in int, nroGrupo: in int) {
+        grupos[id] = nroGrupo;
+        signal(esperaAlumno[id]); // Despierta específicamente a ese alumno
+    }
+
+    // ==========================================
+    // MÉTODOS DE ETAPA 2
+    // ==========================================
+    Procedure Entregar(nroGrupo: in int, nota: out int) {
+        cantEntregas[nroGrupo]++;
+        if (cantEntregas[nroGrupo] == 2) {
+            gruposListos.push(nroGrupo); // El grupo completó la tarea
+            signal(vcJTPCorrigiendo);    // Avisamos al JTP que hay para corregir
+        }
+        
+        while (notas[nroGrupo] == -1) {
+            wait(esperaNota[nroGrupo]); // Ambos alumnos del grupo se duermen acá
+        }
+        nota = notas[nroGrupo];
+    }
+
+    Procedure SiguienteACorregir(nroGrupo: out int) {
+        while (gruposListos.empty()) {
+            wait(vcJTPCorrigiendo); // JTP duerme si no hay grupos listos
+        }
+        nroGrupo = gruposListos.pop();
+    }
+
+    Procedure PonerNota(nroGrupo: in int, nota: in int) {
+        notas[nroGrupo] = nota;
+        signal_all(esperaNota[nroGrupo]); // ¡Magia! Despierta a los 2 alumnos juntos
+    }
 }
-
 

@@ -1,45 +1,72 @@
-//4.  Existen  N  vehículos  que  deben  pasar  por  un  puente  de  acuerdo  con  el  orden  de  llegada.  
-//Considere que el puente no soporta más de 50000kg y que cada vehículo cuenta con su propio 
-// peso (ningún vehículo supera el peso soportado por el puente).
+// 5.  En un corralón de materiales se deben atender a N clientes de acuerdo con el orden de llegada. 
+// Cuando  un  cliente  es  llamado  para  ser  atendido,  entrega  una  lista  con  los  productos  que 
+// comprará, y espera a que alguno de los empleados le entregue el comprobante de la compra 
+// realizada. 
+// a) Resuelva considerando que el corralón tiene un único empleado. 
+// b) Resuelva considerando que el corralón tiene E empleados (E > 1). Los empleados no 
+// deben terminar su ejecución. 
+// c) Modifique la solución (b) considerando que los empleados deben terminar su ejecución 
+// cuando se hayan atendido todos los clientes. 
 
-Respuesta:
+a)
+Process cliente [c: 1..N] {
+    text lista;
+    text comprobante;
 
-Process vehiculo [v: 1..N] {
-    int pesoVehiculo;
-    Puente.entrar(pesoVehiculo);
-    // cruzar puente
-    Puente.salir(pesoVehiculo);
+    Corralon.llegada(lista, comprobante);
+    
 }
 
-Monitor Puente {
-    int pesoActual = 0;
-    cond auto; // cola de espera para los vehículos
-    cond pesoAdecuado; // para avisar que hay peso disponible
-    bool libre = true; // acá indica si la ENTRADA está libre para que el auto pase a evaluar su peso
+Process empleado {
+    text lista;
+    text comprobante;
+    int j;
+
+    for j = 0..N-1{
+        Corralon.obtenerLista(lista);
+        // preparar comprobante
+        Corralon.dejarComprobante(comprobante);
+
+    }
+}
+
+Monitor Corralon {
+    text listaC; // para almacenar la lista del cliente que se está atendiendo
+    text compE; // para almacenar el comprobante que el empleado prepara para el cliente que se está atendiendo
+    cond empleado; // cola de espera para el empleado
+    cond recibiCompr; // para avisar que el comprobante está listo
+    cond cliente; // cola de espera para los clientes
+    cond datos; // cola de espera para los datos
+    cond atencion; // para avisar que el empleado está atendiendo
     int esperando = 0;
 
-    Procedure entrar(pesoVehiculo: in int) {
-        if (!libre) {
-            esperando++;
-            wait(auto);
-        } else {
-            libre = false;
+    Procedure llegada(lista: in text, comprobante: out text) {
+        signal(empleado); // aviso al empleado que hay un cliente esperando
+        esperando++;
+        wait(cliente); // espero a que el empleado me atienda
+        listaC = lista;
+        signal(datos); // aviso al empleado que ya tiene los datos (listaC actualizada)
+        wait(atencion); // espero a que el empleado termine de atenderme
+        comprobante = compE; // para la entrega del comprobante al cliente, por output
+        esperando--; // un cliente menos en espera
+        signal(recibiCompr); // aviso al empleado que ya tomé mi comprobante
+    }    
+
+    Procedure obtenerLista(lista: out text){
+        if (esperando == 0){ // si no hay clientes esperando, el empleado espera
+            wait(empleado);
         }
-        while (pesoActual + pesoVehiculo > 50000) {
-            wait(pesoAdecuado); // espero a que haya peso disponible
-        }
-        pesoActual += pesoVehiculo; // al salir del while, el vehículo ya tiene permitido pasar, entonces sumo su peso al peso actual del puente
-        if (esperando > 0){ // si hay vehículos esperando, el puente sigue ocupado, pero se le da paso al siguiente vehículo que esté esperando
-            esperando--; 
-            signal(auto); // despierto al siguiente vehículo que esté esperando, y vuelve a comprobar el peso
-        }
-        else {
-            libre = true; // si no hay vehículos esperando, el puente queda libre
-        }
+        signal(cliente); // despierto al siguiente cliente en espera
+        wait(datos); // espero a que el cliente me dé la lista
+        lista = listaC;
     }
 
-    Procedure salir(pesoVehiculo: in int) {
-        pesoActual -= pesoVehiculo;
-        signal(pesoAdecuado); // despierto al siguiente vehículo que esté esperando, y vuelve a comprobar el peso
+    Procedure dejarComprobante(compr: in text){
+        compE = compr;
+        signal(atencion); // aviso al cliente que ya terminé de atenderlo
+        wait(recibiCompr); // espero a que el cliente tome su comprobante (compE)
     }
+
 }
+
+

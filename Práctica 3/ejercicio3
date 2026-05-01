@@ -45,6 +45,7 @@ Process Persona[p:1..N] {
   // sigue su camino
 }
 
+// b
 
 b) 
 Monitor AccesoFotocopiadora {
@@ -142,8 +143,8 @@ Monitor AccesoFotocopiadora  {
     }
 }
 
-Process Persona [p:1..N] {
-    AccesoFotocopiadora.entrarFotocopiadora(id, edad);
+Process Persona [p:0..N-1] {
+    AccesoFotocopiadora.entrarFotocopiadora(id);
     //usar fotocopiadora
     AccesoFotocopiadora.salirFotocopiadora();
 }
@@ -172,7 +173,7 @@ Monitor AccesoFotocopiadora {
     }
 
     Procedure asignar () {
-        if (esperando == 0) {
+        if (esperando == 0) { // TODO: consultar si hay que usar while para este caso, despertar espurio?
             wait(empleado); // espera a que alguien llegue
           }
         signal(cola); // permite que una persona use la fotocopiadora
@@ -187,7 +188,7 @@ Process Empleado {
   }
 }
 
-Process Persona [p:1..N] {
+Process Persona [p:0..N-1] {
     AccesoFotocopiadora. entrarFotocopiadora(p);
     //usar fotocopiadora
     AccesoFotocopiadora. salirFotocopiadora(p);

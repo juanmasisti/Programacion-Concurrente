@@ -8,50 +8,23 @@
 
 Process paciente [p: 0..29] {
     int turno = p; // cada paciente conoce su turno
-    Salita.esperar();
+    Salita.esperar(); // espera hasta que sea su turno
     Consultorio.esperarAtencion(turno); // demora hasta que termine de ser atendido
-    Salita.salir();
 }
 
 Process enfermera{
     for i = 0..29{
-        Salita.siguiente();
-        Consultorio.esperarPaciente(); 
+        Salita.siguiente(); // despertar al paciente que tiene el turno actual, podria ser que la enfermera tenga que demorarse esperando a que llegue el paciente
+        Consultorio.esperarPaciente(); // sincroniza que el paciente y la enfermera hayan llegado al consultorio
         Vacunar();
-        Consultorio.terminarAtencion();
-    }
-}
-
-Monitor Consultorio { // realiza el handshake (intercambio / sincronización) entre paciente y enfermera: paciente avisa que llegó, enfermera lo atiende y ambos se sincronizan para que la vacunación ocurra en el momento correcto y el paciente no se vaya antes.
-    cond enf, pac; // colas de espera para la enfermera y el paciente
-    bool llegoPaciente = false; // para que la enfermera sepa si el paciente llegó
-
-    Procedure esperarAtencion(turno: in int){
-        llegoPaciente = true; // marco que el paciente llegó
-        signal(enf); // aviso a la enfermera que ya estoy en el consultorio
-        wait(pac); // espero a que la enfermera me atienda
-        signal(enf); // aviso a la enfermera que ya terminé de ser atendido
-    }
-
-   Procedure esperarPaciente(){
-        if (!llegoPaciente){ // si el paciente no llegó, la enfermera espera
-            wait(enf);
-        }
-        llegoPaciente = false; // marco que el paciente ya está siendo atendido
-        signal(pac); // despierto al paciente para que sea atendido
-        wait(enf); // espero a que el paciente termine de ser atendido
-    }
-
-    Procedure terminarAtencion(){
-        signal(pac); // aviso al paciente que ya terminé de atenderlo
-        wait(enf); // espero a que el paciente se retire
+        Consultorio.terminarAtencion(); // avisa que se termino la atencion y espera a que el paciente se retire para seguir con el siguiente turno
     }
 }
 
 Monitor Salita { // impone orden estricto por turno y maneja ambos casos (paciente temprano / enfermera esperando).
     int turnoActual = -1; // variable para manejar el turno actual
     cond espera[30]; // cola de espera para los pacientes
-    cond enf;
+    cond enf; // para demorar a la enfermera si el paciente no llegó, y para que el paciente avise a la enfermera que ya llegó
     bool presente[30] = ([30] false); // para saber si el paciente está presente
 
     Procedure esperar(int turno){
@@ -68,5 +41,29 @@ Monitor Salita { // impone orden estricto por turno y maneja ambos casos (pacien
             wait(enf); // si el paciente no está presente, la enfermera espera
         }
         signal(espera[turnoActual]); // despierto al paciente cuyo turno es el actual
+    }
+}
+
+Monitor Consultorio { // realiza el handshake (intercambio / sincronización) entre paciente y enfermera: paciente avisa que llegó, enfermera lo atiende y ambos se sincronizan para que la vacunación ocurra en el momento correcto y el paciente no se vaya antes.
+    cond enf, pac; // colas de espera para la enfermera y el paciente
+    bool llegoPaciente = false; // para que la enfermera sepa si el paciente llegó
+
+    Procedure esperarAtencion(turno: in int){
+        llegoPaciente = true; // marco que el paciente llegó
+        signal(enf); // aviso a la enfermera que ya estoy en el consultorio
+        wait(pac); // espero a que la enfermera me atienda
+        signal(enf); // aviso a la enfermera que ya terminé de ser atendido y me retiré
+    }
+
+   Procedure esperarPaciente(){
+        if (!llegoPaciente){ // si el paciente no llegó, la enfermera espera
+            wait(enf);
+        }
+        llegoPaciente = false; // marco que el paciente ya está siendo atendido
+    }
+
+    Procedure terminarAtencion(){
+        signal(pac); // aviso al paciente que ya terminé de atenderlo
+        wait(enf); // espero a que el paciente se retire
     }
 }

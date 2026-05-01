@@ -1,0 +1,78 @@
+// 6.  En un entrenamiento de fútbol hay 20 jugadores que forman 4 equipos (cada jugador conoce 
+// el equipo al cual pertenece llamando a la función DarEquipo()). Cuando un equipo está listo 
+// (han llegado los 5 jugadores que lo componen), debe enfrentarse a otro equipo que también 
+// esté listo (los dos primeros equipos en juntarse juegan en la cancha 1, y los otros dos equipos 
+// juegan en la cancha 2). Una vez que el equipo conoce la cancha en la que juega, sus jugadores 
+// se dirigen a ella. Cuando los 10 jugadores del partido llegaron a la cancha comienza el partido, 
+// juegan  durante  50  minutos,  y  al  terminar  todos  los  jugadores  del  partido  se  retiran  (no  es 
+// necesario que se esperen para salir). 
+
+Process Jugador [id: 0..19]{
+    int nroEquipo, nroCancha;
+    nroEquipo = DarEquipo(id); // Función externa dada
+
+    Equipo[nroEquipo].listo(nroCancha); // Llamada al monitor del equipo correspondiente
+    Cancha[nroCancha].llegada(); // Llamada al monitor de la cancha correspondiente
+}
+
+Process Partido [id: 0..1] {
+    Cancha[id].iniciarPartido(); // Llamada al monitor de la cancha correspondiente para iniciar el partido
+    // Delay 50 min
+    Cancha[id].terminarPartido(); // Llamada al monitor de la cancha correspondiente para terminar el partido
+}
+
+Monitor Equipo[id: 0..3] {
+    int equipoCant = 0;
+    cond espera;
+    int cancha;
+
+    Procedure Listo (canchaId: out int) {
+        equipoCant++;
+        if (equipoCant < 5){
+            wait(espera);
+        } 
+        else { // llega el quinto jugador del equipo
+            Administrador.calcularCancha(cancha); // Llamada al monitor del administrador para asignar cancha
+            signal_all(espera); // Despierta a los jugadores de su equipo que estaban esperando a que el equipo esté completo
+        }
+        canchaId = cancha;
+    }
+}
+
+Monitor Administrador {
+    int totalEquiposFormados = 0;
+
+    Procedire calcularCancha (canchaId: out int){
+        totalEquiposFormados++;
+        if (totalEquiposFormados <= 2) {
+            canchaId = 1; // Asigna cancha 1 a los dos primeros equipos formados
+        } else {
+            canchaId = 2; // Asigna cancha 2 a los siguientes dos equipos formados
+        }
+    }
+}
+
+
+Monitor Cancha[id: 0..1]{
+    int cant = 0;
+    cond espera;
+    cond inicio;
+
+    Procedure llegada() {
+        cant++:
+        if (cant == 10){
+            signal(inicio); // si llega a 10 jugadores, despierta al proceso del partido para iniciar el juego
+        }
+        wait(espera); // espera representa que estan dentro de la cancha 
+    }
+
+    Procedure iniciarPartido() {
+        if (cant < 10) {
+            wait(inicio); // Espera a que lleguen los 10 jugadores para iniciar el partido
+        }
+    }
+
+    Procedure terminarPartido() {
+        signal_all(espera); // Despierta a los jugadores que estaban "jugando" para que se retiren de la cancha
+    }
+}
