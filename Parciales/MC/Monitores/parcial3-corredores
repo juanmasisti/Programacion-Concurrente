@@ -26,7 +26,7 @@ Monitor Largada {
     }
 }
 
-Monitor AdminPuente {
+Monitor AdminPuente { // el monitor administra el acceso al puente, garantizando que se respete el orden de llegada, si el monitor representara al puente, no se podría garantizar el orden de llegada, ya que el proceso que se despierta compite con los recién llegados por la variable booleana, y no hay garantía de orden de llegada.
     bool libre = true;
     cond espera; // cola de espera para los corredores
     int cant = 0; // para contar la cantidad de corredores esperando

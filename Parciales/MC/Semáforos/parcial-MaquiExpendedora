@@ -1,0 +1,52 @@
+// Resolver con SEMÁFOROS el siguiente problema. Se debe simular el uso de UNA máquina expendedora de agua
+// con capacidad para 20 botellas por parte de U usuarios. Además existe UN repositor encargado de reponer
+// las botellas de la máquina. Cuando un usuario llega a la máquina expendedora, espera su turno (respetando
+// el orden de llegada), saca una botella y se retira. Si encuentra la máquina sin botellas, le avisa al 
+// repositor para que cargue nuevamente la máquina con 20 botellas; espera a que se haga la recarga; saca una
+// botella y se retira. 
+// Nota: Mazimizar la concurrencia; mientras se reponen las botellas se debe permitir que otros usuarios se encolen.
+
+sem mutex = 1; // semáforo para proteger el acceso a la cola de usuarios esperando su turno
+sem esperar[U] = ([U] 0); // semáforo para que los usuarios esperen su turno para sacar una botella
+sem reponer = 0; // semáforo para que el repositor espere a que un usuario le avise que la máquina está vacía
+sem finReponer = 0; // semáforo para que el usuario espere a que el repositor termine de recargar la máquina para sacar su botella
+
+bool libre = true; // variable para indicar si la máquina está libre o no.
+queue cola; // cola para guardar el orden de llegada de los usuarios que encontraron a la máquina expendedora ocupada
+int cantBotellas = 20; // variable para llevar la cuenta de las botellas disponibles en la máquina
+
+Process Usuario [id: 0..U-1]{
+    int i, auxU;
+    P(mutex);
+    if (not libre){ // si la máquina no está libre, el usuario se encola para esperar su turno
+        cola.push(id); // encola al usuario que llegó
+        V(mutex);
+        P(esperar[id]); // el usuario espera a que le toque su turno para sacar una botella
+    }
+    else{ // si la máquina está libre, el usuario puede sacar una botella
+        libre = false; // indica que la máquina ya no está libre porque un usuario la está usando
+        V(mutex);
+    }
+    if (cantBotellas == 0){ // si la máquina está vacía, el usuario le avisa al repositor para que recargue la máquina
+        V(reponer); // aviso al repositor que la máquina está vacía para que haga la recarga
+        P(finReponer); // el usuario espera a que el repositor termine de recargar la máquina
+    }
+    // sacar una botella
+    cantBotellas --; // actualiza la cantidad de botellas disponibles después de sacar una botella
+    P(mutex); 
+    if (empty(cola)) libre = true; // si no hay usuarios esperando, la máquina queda libre
+    else{ // si hay usuarios esperando, se le avisa al siguiente usuario que ya puede sacar su botella
+        auxU = cola.pop(); // obtengo el id del siguiente usuario que va a sacar una botella
+        V(esperar[auxU]); // aviso al siguiente usuario que ya puede sacar su botella
+    }
+    V(mutex);
+}
+
+Process Repositor {
+    while (true){
+        P(reponer); // espera a que un usuario le avise que la máquina está vacía
+        recargarMaquina(); // función que simula la recarga de la máquina con 20 botellas
+        cantBotellas = 20; // actualiza la cantidad de botellas disponibles, no es necesario usar mutex porque en este momento solo el repositor va a poder acceder a esta variable, el usuario esta dormido esperando a que se recargue la máquina, y el siguiente usuario que llegue va a encontrar la máquina ocupada y se va a encolar.
+        V(finReponer); // aviso al usuario que ya se hizo la recarga para que pueda sacar su botella
+    }
+}

@@ -1,0 +1,62 @@
+// Resolver con SEMÁFOROS el siguiente problema. En un examen final hay P alumnos y 3 profesores. Cuando todos los lumnos
+// y los profesores han llegado comienza el examen. Para esto uno de los profesores (el primero en llegar) le da el examen 
+// a cada alumno. Cada alumno resuelve su examen, lo entrega y espera a que alguno de los profesores lo corrija y le indique la nota. 
+// Los profesores corrigen los exámenes respetando el orden en que los alumnos van entregando.
+// Nota: maximinzar la concurrencia.
+
+sem mutexLlegada = 1; // semáforo para proteger el acceso a la variable que cuenta la cantidad de alumnos y profesores que llegaron
+sem mutexCola = 1; // semáforo para proteger el acceso a la cola donde los alumnos esperan a que los profesores corrijan sus exámenes
+sem primerProfesor = 0;
+sem hayExamen = 0;
+sem esperaExamen[P] = ([P] 0);
+sem esperaNota[P] = ([P] 0);
+int cant = 0; // contador de alumnos y profesores que llegaron
+int notas[P]; // array para guardar las notas de cada alumno
+int primerP = -1;
+text examenes[P]; // array para guardar el examen de cada alumno, para que los profesores puedan corregirlos
+queue cola; // cola para guardar el orden en que los alumnos entregan sus exámenes,
+
+Process Alumno [id: 0..P-1]{
+    text examen;
+
+    P(mutexLlegada); // se hace el chequeo dentro de SC.
+    cant++;
+    if (cant == P + 3) V(primerProfesor); // si llegaron todos, aviso al primer profesor que ya pueden empezar
+    V(mutexLlegada);
+    P(esperaExamen[id]); // el alumno espera a que el primer profesor le entregue el examen
+    examen = resolverExamen(examenes[id]); // el alumno resuelve su examen
+    P(mutexCola);
+    cola.push(id, examen); // encola al alumno que entregó su examen, para que los
+    V(mutexCola);
+    V(hayExamen); // aviso a los profesores que hay un examen para corregir
+    P(esperaNota[id]); // el alumno espera a que le asignen la nota
+    // puede acceder a su nota en su array de notas[id]
+
+}
+
+
+Process Profesor [id: 0..2]{
+    int i, idAlumno;
+    text e;
+
+    P(mutexLlegada); // usamos mismo semaforo mutex con los alumnos porque deben llegar todos para que el examen comience
+    cant++;
+    if (cant == P + 3) V(primerProfesor); // si llegaron todos, aviso al primer profesor que ya pueden empezar
+    if (primerP == -1) primerP = id; // guardo el id del primer profesor que llegó
+    V(mutexLlegada);
+    if (primerP == id){
+        P(primerProfesor); // el primer profesor espera a que lleguen todos los alumnos y profesores
+        for (i=0; i<P; i++) {
+            examenes[i] = darExamen(); // el primer profesor le da el examen a cada alumno
+            V(esperaExamen[i]); // despertar al alumno despues de haber entregado su examen, no al revés.
+        }
+    }
+    while (true){
+        P(hayExamen); // espera a que haya un examen para corregir
+        P(mutexCola);
+        cola.pop(idAlumno, e); // obtengo el id y el examen del alumno que entregó su examen
+        V(mutexCola);
+        notas[idAlumno] = corregirExamen(e); // corrige el examen del alumno y guarda la nota
+        V(esperaNota[idAlumno]); // aviso al alumno que ya tiene su nota asignada
+    }
+}

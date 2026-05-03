@@ -1,0 +1,59 @@
+// Resolver el siguiente problema con SEMÁFOROS. Simular la atención de una Planta Verificadora
+// de Vehículos, donde se revisan cuestiones de seguridad de vehículos de a uno por vez. 
+// Hay N vehículos que deben ser verificados, donde algunos son autos y otros ambulancias.
+// Antes de ser verificados, los autos deben hacer el pago correspondiente en la Caja de la Planta,
+// donde le entregarán un recibo de pago. Las ambulancias no pagan. Los vehículos son atendidos de acuerdo 
+// al orden de llegada pero siempre dando prioridad a las ambulancias.
+
+sem mutexCaja, mutexPlanta  = 1; // semáforo para proteger el acceso a la caja
+sem esperar_vehiculo = 0; // semáforo para que los vehículos esperen a ser atendidos en la planta
+sem caja = 0;
+sem esperar_comprobante[N] = ([N] 0); // semáforo para que los autos esperen a que les entreguen el comprobante de pago
+sem esperar_verificacion[N] = ([N] 0); // semáforo para que
+queue cola_autos, cola_ambus, cola_pagos;
+comprobantes comps[N]; // array para guardar los comprobantes de pago de cada auto, para que la planta pueda verificar que el auto pagó antes de atenderlo
+
+Process Vehiculo [id: 0..N-1]{
+    bool soy_auto = esAuto(id); // función que determina si el vehículo es un auto o una ambulancia
+    if (soy_auto){
+        P(mutexCaja); // el auto espera a que la caja esté libre para hacer el pago
+        cola_pagos.push(id); // encola al auto que va a hacer el pago (push)
+        V(mutexCaja); // libera la caja para que otro auto pueda hacer su pago
+        V(caja); // semaforo de señalizacion para que la caja sepa que hay un auto esperando para hacer el pago, y no tenga que chequear constantemente la cola de pagos
+        P(esperar_comprobante[id]); // el auto espera a que le entreguen el comprobante de pago
+        comprobante = comps[id]; // el auto recibe su comprobante de pago
+    }
+    P(mutexPlanta); // el vehículo espera a que la planta esté libre para ser atendido
+    if (soy_auto) cola_autos.push(id);
+    else cola_ambus.push(id);
+    V(mutexPlanta); // libera la planta para que otro vehículo pueda ser atendido
+    V(esperar_vehiculo); // aviso a la planta que hay un vehículo esperando para ser atendido
+    P(esperar_verificacion[id]); // el vehículo espera a que lo atiendan en la planta y le indiquen que ya fue verificado
+}
+
+
+Process Caja{
+    int idAuto;
+    while (true){
+        P(caja);
+        P(mutexCaja); // mismo semaforo porque usa la misma cola de pagos, la caja obtiene (pop)
+        idAuto = cola_pagos.pop(); // obtengo el id del proximo auto que va a hacer el pago
+        V(mutexCaja);
+        comps[idAuto] = generarComprobante(); // genero el comprobante de pago para el auto
+        V(esperar_comprobante[idAuto]); // aviso al auto que ya tiene su comprobante de pago
+    }
+}
+
+Process Planta{
+    int idVehiculo;
+    while (true) // la planta atiende vehículos de forma indefinida
+    {
+        P(esperar_vehiculo);
+        P(mutexPlanta); // mismo semaforo porque usa las mismas colas de vehículos, la planta obtiene (pop)
+        if (not empty(cola_ambus)) idVehiculo = cola_ambus.pop(); // si hay ambulancias esperando, atiende a la primera ambulancia que llegó, no genera busy waiting porque siempre una de las 2 colas va a tener uno al usar semaforo de señalizacion esperar_vehiculo
+        else idVehiculo = cola_autos.pop(); // si no hay ambulancias, atiende al primer auto que llegó
+        V(mutexPlanta);
+        verificarVehiculo(idVehiculo); // función que simula la verificación del vehículo
+        V(esperar_verificacion[idVehiculo]); // aviso al vehículo en particular que ya fue verificado (arreglo de semaforos privados para cada vehículo)
+    }
+}

@@ -1,0 +1,53 @@
+// Resolver con SEMAFOROS el siguiente problema. Una empresa de turismo posee UN micro
+// con capacidad para 50 personas. Hay un único vendedor que atiende a los C clientes (C > 50)
+// que intentan comprar un pasaje de acuerdo al orden de llegada (suponga que la atención de un cliente
+// tarda un par de minutos), si aún hay lugares disponibles le indica el número de asiento que le tocó.
+// Cada cliente, luego de ser atendidos por el vendedor, se dirige al micro para subir en caso de que 
+// le hayan dado un asiento, y en caso contrario se retira sin viajar. El micro espera a que los 50 pasajeros 
+// hayan subido para realizar el viaje. Nota: Maximizar la concurrencia.
+
+sem mutexCola = 1; // semáforo para proteger la cola
+sem hayCliente = 0; // semáforo para indicar que hay clientes esperando
+sem subioCliente = 0;
+sem atendido[C] = ([C], 0); // array de semáforos para que cada cliente espere a ser atendido
+
+int pasaje[C] = ([C], 0); // array para guardar el número de asiento que le tocó a cada cliente
+queue cola;
+
+Process Cliente [id: 0..C-1]{
+    int asiento;
+    P(mutexCola);
+    cola.push(id); // encolar el cliente
+    V(mutexCola);
+    V(hayCliente); // semaforo de señalización para avisar al vendedor que hay un cliente mas esperando, 
+    // para que el vendedor no tenga que estar chequeando si la cola esta vacia, esto haria BUSY WAITING y es un error grave.
+    P(atendido[id]); // esperar a ser el vendedor le indique que termino de atenderlo
+    if (pasaje[id] > 0) V (subioCliente); // si el cliente tiene un asiento asignado, aviso que subió al micro
+}
+
+Process Vendedor {
+    int cant = 0; // contador de clientes atendidos
+    int i, idCliente;
+
+    for (i=0, cant < C; i++){ // sabemos que atiende a los C  clientes y no tiene que hacer mas nada, por eso es un for.
+        P(hayCliente); // demorarse hasta estar seguro que hay al menos un elemento en la cola de clientes.
+        P(mutexCola); // accedo con mutex a la cola para sacar al cliente que sigue
+        pop(cola, idCliente); // saco al cliente de la cola
+        V(mutexCola);
+        if (cant < 50){ // variable local ya que solo la usa el vendedor, si el contador de clientes atendidos es menor a 50, le asigno un asiento al cliente
+            pasaje[idCliente] = darAsiento(); // en la posicion del cliente que acaba de sacar de la cola, guardo el numero de asiento que le tocó, si el cliente no tiene asiento, queda en 0
+            cant++;
+        }
+        V(atendido[idCliente]); // aviso al cliente que fue atendido, para que sepa si le dieron un asiento o no
+    }
+}
+
+Process Micro {
+    int i;
+    for (i=0; i<50; i++) P(subioCliente); // esperar a que suban los 50 clientes para salir de viaje
+}
+
+//Errores comunes: 
+// 1) no usar semaforo hayCliente y que se el vendedor acceda a la cola para ver si hay cliente esperando
+// 2) que el micro use variable compartida cant en vez de una local para esperar a que los 50 clientes suban.
+// 3) en vez de usar array de semaforo atendido[C], utilizan un semaforo comun, lo que genera que el vendedor luego de asignar asiento despierta a cualquiera de los clientes que probablemente no sea al que acaba de venderle el asiento.

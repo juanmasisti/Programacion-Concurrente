@@ -24,14 +24,14 @@ Monitor Sala{
 
     Procedure esperarInicio(){
         if (cant < 20)
-            wait(esperaCoordinador); // si no llegaron todos, la persona espera
+            wait(esperaCoordinador); // si no llegaron todos, el coordinador espera
     }
 
     Procedure esperarTurno(){
         cant++;
         if (cant == 20) // si llegaron todos, aviso al coordinador
             signal(esperaCoordinador);
-        wait(espera); // espera a que inice el coordinador
+        wait(espera); // espera a que termine el coordinador para hacer su presentación
     }
 
     Procedure terminar(){

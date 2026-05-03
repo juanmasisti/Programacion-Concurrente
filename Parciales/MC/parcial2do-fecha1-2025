@@ -1,0 +1,120 @@
+// Parcial 2do semestre - Fecha 1 - 2025
+
+// Implemente una solución para el siguiente problema usando SEMÁFOROS. Se debe simular el 
+// procesamiento de un sistema clasificador de 365 datasets meteorológicos. Todos los datasets se encuentran ya
+// cargados en una estructura de datos. Para procesarla, el sistema dispone de 5 workers que trabajan colaborativamente
+// procesando los datasets de a uno  por vez. Cada procesamiento puede tomar un tiempo diferente y para realizarla los 
+// workers disponen de la función Procesar(d), la cual retorna como resultado un booleano que indica si los datos corresponden
+// a un clima tropical (true) o no (false). De acuerdo con el resultado, cada worker inserta el dataset en una cola de "tropicales"
+// o de "no-tropicales". Nota: Maximizar la concurrencia.
+
+sem mutexCola = 1; // semáforo para proteger el acceso a la estructura de datos donde están cargados los datasets
+sem mutexColaT = 1; // semáforo para proteger el acceso a la estructura de datos donde se van a cargar los datasets tropicales
+sem mutexColaNoT = 1; // semáforo para proteger el acceso a la estructura de datos donde se están van a cargar los datasets no tropicales}
+
+queue cola[365]; // cola para manejar el orden de procesamiento de los datasets
+queue colaTropicales; // cola para guardar los datasets que corresponden a climas tropical
+queue colaNoTropicales; // cola para guardar los datasets que no corresponden a climas tropicales
+
+Process Worker [id: 0..4]{
+    text dataset;
+    bool esTropical;
+
+        P(mutexCola);
+        while (not cola.isEmpty()) { // mientras haya datasets para procesar
+            dataset = cola.pop()
+            V(mutexCola);
+            esTropical = Procesar(dataset); // proceso el dataset
+            if (esTropical){
+                P(mutexColaT);
+                colaTropicales.push(dataset);   // inserto el dataset en la cola de tropicales
+                V(mutexColaT);
+            } else {
+                P(mutexColaNoT);
+                colaNoTropicales.push(dataset); // inserto el dataset en la cola de no tropicales
+                V(mutexColaNoT);
+            }
+            P(mutexCola); // antes de que el while pegue la vuelta para volver a evaluar la condición, vuelvo a competir por bloquear el semáforo 
+        }
+        V(mutexCola); // libero el semáforo para que otro worker pueda acceder a la cola de datasets 
+}
+
+// Implemente una solución para el siguiente problema usando SEMÁFOROS. En un taller de impresión 3D hay N clientes que solicitan
+// piezas para ser impresas y el resultado para poder retirarlas. El taller cuenta con una impresora 3D que fabrica las piezas en el 
+// orden de llegada de los pedidos. Una vez que le entregan la pieza, el cliente debe informar en pantalla si cumplió lo solicitado. 
+// Nota: la función ImprimirPieza(p) imprime la pieza en cuestión; la función ObtenerPedido(id) retorna el pedido de pieza para el cliente
+// id; VerificarPieza(p) retorna true si el pedido p cumple lo solicitado o false en caso contrario. 
+
+sem mutexCola = 1; // semáforo para proteger el acceso a la cola de pedidos
+sem esperarPedido[N] = ([N] 0); // semáforo para que cada cliente espere a que le entreguen su pedido
+sem hayPedido = 0; // semáforo para que la impresora sepa que hay un pedido para imprimir
+
+queue colaPedidos; // cola para manejar el orden de llegada de los clientes que hicieron un pedido
+pieza piezas[N]; // array para guardar las piezas que se van a imprimir para cada cliente, para que los clientes puedan verificar si su pedido cumplió lo solicitado una vez que les entreguen su pieza
+
+Process Cliente [id: 0..N-1]{
+        P(mutexCola);
+        colaPedidos.push(id); // encola al cliente que hizo el pedido
+        V(mutexCola);
+        V(hayPedido); // aviso a la impresora que hay un pedido para imprimir
+        P(esperarPedido[id]); // el cliente espera a que le entreguen su pedido
+        if (VerificarPieza(piezas[id])) {
+            write("El pedido cumple lo solicitado");
+        } else {
+            write("El pedido no cumple lo solicitado");
+        }
+}
+
+Process Impresora {
+    int idCliente;
+    while (true){
+        P(hayPedido); // espera a que haya un pedido para imprimir
+        P(mutexCola); // mutex para acceder a la cola de pedidos
+        idCliente = colaPedidos.pop(); // obtengo el id del cliente que hizo el pedido
+        V(mutexCola);
+        Pieza p = ObtenerPedido(idCliente); // obtengo el pedido del cliente para imprimirlo
+        piezas[idCliente] = ImprimirPieza(p); // imprimo la pieza
+        V(esperarPedido[idCliente]); // aviso al cliente que ya le entregué su pedido
+    }
+}
+
+// Implemente una solución para el siguiente problema usando MONITORES. En un evento hay
+// 50 participantes que quieren tomarse fotos en una cabina fotográfica. La cabina puede 
+// ser usada por una persona a a vez, siguiendo el orden de llegada, pero dando prioridad a las personas 
+// de mayor edad (cuando la cabina está libre la debe usar la persona de mayor edad entre las que estén 
+// esperando para usarla). Cada participante se toma una única foto y luego se retira. 
+// Nota: solo se pueden utilizar procesos que representes a los particiantes. La funcion 
+// obtenerEdad() retorna la edad de la persona; la función TomarFoto() simula el uso de la cabina.
+
+Process participante [id: 0..49]{
+    int edad = obtenerEdad(id);
+    AdminCabina.esperar(id, edad);
+    TomarFoto();
+    AdminCabina.terminar();
+}
+
+Monitor AdminCabina {
+    cond espera[50];
+    colaOrdenada cola; // cola ordenada por edad
+    int cant = 0; // para contar la cantidad de participantes esperando
+    bool cabinaLibre = true;
+    int idSig; // para guardar el id del siguiente participante que va a usar la cabina
+
+    Procedure esperar(in int: id, in int: edad){
+        if (cabinaLibre) cabinaLibre = false; // si la cabina está libre, el participante puede usarla
+        else {
+            cant++; // se incrementa antes de esperar, para que los otros participantes lo vean
+            agregar(cola, id, edad); // agrego el participante a la cola ordenada por edad
+            wait(espera[id]); // si no está libre, el participante espera
+        }
+    }
+
+    Procedure terminar(){
+        if (cant > 0){ // si hay participantes esperando, dejo usar a la cabina al siguiente
+            cant--;
+            idSig = extraer(cola); // saco el participante de la cola con mayor edad
+            signal(espera[idSig]); // aviso al participante que es su turno
+        }
+        else cabinaLibre = true; // si no hay participantes esperando, la cabina queda libre
+    }
+}

@@ -1,0 +1,63 @@
+// Resolver el siguiente problema con SEMÁFOROS. En una competencia culinaria se juntan
+// 1 jurado y C concursantes. Una vez que todos los concursantes llegaron, el jurado
+// les asigna la receta que deben realizar. A continuación, los concursantes cocinan el plato 
+// pedido (a cada uno le lleva un tiempo variable) y lo exhiben ante el jurado en el orden en 
+// que van terminando. El jurado asigna un puntaje a cada concursante, el cual lo guarda para su CV.
+
+sem llegada = 1;
+sem esperar_concursantes = 0;
+sem jurado = 0;
+sem esperar_receta[C] = ([C], 0);
+sem esperar_nota[C] = ([C], 0);
+sem mutex = 1; // semáforo para proteger el acceso a la variable que guarda el puntaje
+sem presentar_plato = 0; // semáforo para que el concursante espere a que el jurado esté listo para ver su plato
+int cant = 0; // contador de concursantes que llegaron
+queue q; // cola para guardar el orden en que los concursantes terminan de cocinar, para que el jurado los vea en ese orden
+recetas recetas[C]
+plato platos[C] // array para guardar el plato que hizo cada concursante, para que el jurado pueda verlo y asignar la nota correspondiente
+int notas[C]; // array para guardar las notas de cada concursante
+
+Process Concursante [id: 0..C-1] {
+    int i;
+    P(llegada);
+    cant ++; // accedida dentro de SC.
+    if (cant < C) {// verificar si ya llegaron todos los concursantes, tiene que estar dentro de la SC
+        V(llegada) // libera el semáforo para que el siguiente concursante pueda llegar
+        P(esperar_concursantes); // como esta barrera solo se libera una vez, no necesitamos un array de semaforos.
+    } 
+    else{ // ya llegaron todos los concursantes
+        V(llegada)
+        V(jurado); // aviso al jurado que ya llegaron todos los concursantes
+        for (i=0; i<C-1; i++) 
+            V(esperar_concursantes); // libero a los concursantes que están esperando
+    }
+    P(esperar_receta[id]); // el concursante espera a que el jurado le asigne la receta
+    platos[id] = cocinar(recetas[id]); // el concursante cocina el plato pedido
+    P(mutex);
+    q.push(id); // encolo al concursante que terminó de cocinar, para que el
+    V(mutex);
+    V(presentar_plato); 
+    P(esperar_nota[id]); // el concursante espera a que el jurado le asigne la nota
+    
+}
+
+Process Jurado {
+    int i, idC;
+    P(jurado); // espera a que lleguen todos los concursantes
+    for (i=0;i<C; i++){
+        recetas[i] = generarReceta(); // asigna la receta a cada concursante
+        V(esperar_receta[i]); // aviso al concursante que ya tiene la receta asignada
+    }
+    for (i=0; i<C; i++){
+        P(presentar_plato); // espera a que el concursante presente su plato
+        P(mutex);
+        idC = q.pop(); // obtengo el id del concursante que presentó su plato
+        V(mutex);
+        notas[idC] = asignarNota(platos[idC]); // asigna un puntaje al concursante
+        V(esperar_nota[idC]); // aviso al concursante que ya tiene su nota asignada
+    }
+}
+
+// Errores comunes:
+// 1) No proteger las colas con mutex
+// 2) No utilizar jurado

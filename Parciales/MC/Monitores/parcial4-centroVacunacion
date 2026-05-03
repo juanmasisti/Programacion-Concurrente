@@ -1,0 +1,68 @@
+// Resolver el siguiente problema con MONITORES. Simular la atención en un Centro de Vacunacion
+// con 8 puestos para vacunar contra el coronavirus. Al centro acuden 200 pacientes para ser vacunados, 
+// cada uno de ellos ya conoce el puesto al que se debe dirigir. En cada puesto hay UN empleado para vacunar
+// a los pacientes asignados a dicho puesto, y lo hace de acuerdo al ordeb dado  por la edad de paciente
+// (cuando está libre atiende al paciente de mayor edad que esté esperando en ese momento en ese puesto).
+// Cada paciente al llegar al puesto que tenía asignado espera a que lo llamen y se dirige a la silla para que el
+// empleado lo vacune, y luego se retira. Nota: suponer que existe una funcion Vacunar() que simula la atención 
+// del paciente. Suponer que cada puesto tiene asignado 25 pacientes. Todos los procesos deben terminar.
+
+Process paciente [id: 0..199]{
+    int numP= ...
+    int edad = ...
+
+    Puesto[numP].esperar(id, edad)
+    Silla[numP].esperarAtencion();
+}
+
+Process empleado [id: 0..7]{
+    int cant;
+    for (cant=0; cant<25; cant++){
+        Puesto[id].siguiente();
+        Silla[id].esperarPaciente();
+        Vacunar();
+        Silla[id].terminarAtencion();
+    }
+}
+
+Monitor Puesto [id: 0..7]{
+    cond esperaPac[200]; // sea cual sea el puesto que le toca, el paciente se duerme en su posicion correspondiente
+    cond emp;
+    colaOrdenada cola; // cada puesto tiene su propia cola ordenada por la edad
+    int idPac, e;
+
+    Procedure esperar(id, edad){
+        agregar(cola, id, edad); // agrego el paciente a la cola ordenada por edad
+        signal(emp); // aviso al empleado que hay un paciente esperando por las dudas que el empleado esté dormido
+        wait(esperaPac[id]); // el paciente espera a que lo llamen 
+    }
+
+    Procedure siguiente(){
+        if (empty(cola)) wait (emp); // si no hay pacientes esperando, el empleado espera
+        idPac = extraer(cola); // saco el paciente de la cola
+        signal(esperaPac[idPac]); // aviso al paciente que es su turno
+    }
+}
+
+Monitor Silla [id: 0..7]{
+    bool llegoPaciente = false;
+    cond emp; // para que se duerma el empleado esperando a que llegue un paciente
+    cond pac; // para que se duerma el paciente esperando a que termine la atención
+
+    Procedure esperarAtencion(){
+        llegoPaciente = true;
+        signal(emp);
+        wait(pac); // el paciente espera a que termine la atención
+        signal(emp); // aviso al empleado que me retire
+    }
+
+    Procedure esperarPaciente(){
+        if (!llegoPaciente) wait(emp);
+        llegoPaciente = false; // el empleado atiende al paciente, por lo que la silla queda vacía
+    }
+
+    Procedure terminarAtencion(){ // este procedimiento va a parte para maximizar la concurrencia, sino no se podria dar la vacunacion que se ejecuta si o si fuera del monitor.
+        signal(pac); // aviso al paciente que termino la atención
+        wait(emp); // espero a que el paciente se retire
+    }
+}

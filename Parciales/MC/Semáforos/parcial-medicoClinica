@@ -1,0 +1,33 @@
+// Resolver con SEMÁFOROS el siguiente problema. En una clínica hay un médico que debe atender
+// a 20 parcientes de acuerdo al turno de cada uno de ellos (no puede atender al paciente con turno
+// i+1 si aún no atendió al que tiene turno i). Cada paciente ya conoce su turno al comenzar (valor entero
+// entre 0 y 19, o entre 1  y 20, como les resulte más cómodo), al llegar espera que el médico lo llame para ser atendido,
+// se dirige al consultorio y luego espera hasta que el médico lo termine de atender para retirarse.
+// Nota: los únicos procesos que se pueden usar son los que representen a los pacientes y al médico; se debe asegurar que 
+// nunca haya más de un paciente en el consultorio; no se puede usar el ID del proceso como turno.
+
+sem esperar_turno[20] = ([20] 0); // semáforo para que cada paciente espere a que el médico lo llame para ser atendido
+sem entrada, listo, salida = 0;
+
+Process Paciente [id: 0..19]{
+    int miTurno = ...; // cada paciente conoce su turno al comenzar
+    P(esperar_turno[miTurno]); // el paciente espera a que el médico lo llame para ser atendido
+    // entra al consultorio
+    V(entrada); // aviso al médico que el paciente con turno miTurno entró al consultorio
+    P(listo); // el paciente espera a que el médico termine de atenderlo para retirarse
+    // se retira del consultorio
+    V(salida); // aviso al médico que el paciente con turno miTurno se retiró del consultorio
+
+}
+
+Process Medico {
+    int turno;
+    for (turno=0; turno<20; turno++){
+        V(esperar_turno[turno]);
+        P(entrada); // el médico espera a que el paciente entre al consultorio, no es necesario que sea un array porque solo 1 paciente a la vez va a poder pasar, ya que estaria dormido en su semáforo de esperar_turno[turno] hasta que el médico lo llame.
+        atenderPaciente(turno); // función que simula la atención del paciente
+        V(listo); // aviso al paciente que ya terminé de atenderlo para que se retire
+        P(salida); // el médico espera a que el paciente se retire para llamar al siguiente paciente
+    }
+
+}
