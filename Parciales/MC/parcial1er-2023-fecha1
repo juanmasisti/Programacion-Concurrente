@@ -1,0 +1,129 @@
+Parcial 1er Semestre (03/05/2023) - Fecha 1
+
+// Resolver con SEMÁFOROS el siguiente problema. Para un experimento se tiene una red con 15 controladores de temperatura y dos módulos centrales.
+// Los controladores cada cierto tiempo toman la temperatura mediante la funcion medir() y la envía para que alguna de las centrales le indique que debe hacer
+// (numero de 1 a 10), y luego realiza esa accion mediante la funcion actuar() para determinar la accion que deberá hacer ese controlador (numero de 1 a 10).
+// Nota: el tiempo que espera cada controlador para tomar nuevamente la temperatura empieza a contar después de haber ejecutado la funcion actuar().
+
+
+sem mutex = 1; // semáforo para proteger la cola
+sem espera[15] = ([15], 0); // array de semáforos para que cada controlador espere su turno
+Cola c; // cola para manejar el orden de llegada
+sem hayPedido = 0; // semáforo para indicar que hay un pedido de un controlador
+int vecAcciones[15]; // array para guardar las acciones que debe hacer cada controlador
+
+Process Controlador [id: 0..14]{
+    double tiempo; // variable para guardar el tiempo que tarda en volver a medir la temperatura, se simula con la función delay()
+    while (true){
+        double temp = medir(); // mide la temperatura
+        P(mutex);
+        c.push(id, temp); // encolar el controlador
+        V(mutex);
+        V(hayPedido); // aviso a la central que hay un pedido
+        P(espera[id]); // espera a ser atendido por una central
+        actuar (vecAcciones[id]); // realiza la accion indicada por la central
+        delay(tiempo); // simula el tiempo que tarda en volver a medir la temperatura, el tiempo empieza a contar después de ejecutar actuar()
+    }
+}
+
+Process Central [id: 0..1]{
+    int idControlador;
+    double temp;
+    while (true){
+        P(hayPedido);
+        P(mutex);
+        c.pop(idControlador, temp); // desencolar el controlador
+        V(mutex);
+        // determina la accion a realizar segun la temperatura medida por el controlador, se simula con la función determinar()
+        vecAcciones[idControlador] = determinar(temp);
+        V(espera[idControlador]); // despierto al controlador para que realice la accion
+    }
+}
+
+// Resolver con MONITORES el siguiente problema. Hay una boleteria virtual que vende en forma online E entradas para un partido de futbol a P 
+// personas (P > E) de acuerdo con el orden de llegada. Cuando la boleteria atiende a una persona, si aún quedan entradas disponibles le envía
+// el número de entrada vendida, sino le indica que no hay mas entradas. 
+// Nota: suponga que existe la funcion vender() que simula la venta de la entrada.
+
+Process Persona [id: 0..P-1]{
+    int numEntrada; 
+    bool pudeComprar;
+
+    // Hace el pedido y se queda esperando la respuesta
+    Admin.comprarEntrada(id, numEntrada, pudeComprar);
+}
+
+Process Boleteria {
+    int numEntrada, aux;
+    int cantEntradas = E;
+    for i: 0..P-1{
+        Admin.sig(aux)
+        if (cantEntradas > 0){
+            numEntrada = vender(aux); // se simula la venta de la entrada con la función vender()
+        } else {
+            numEntrada = -1; // se indica que no hay mas entradas con un numero de entrada negativo
+        }
+        Admin.resp(aux, numEntrada); // se responde al comprador con el numero de entrada vendida o con la indicacion de que no hay mas entradas
+    }
+}
+
+Monitor Admin {
+    Cola c;
+    cond espera;
+    cond hayPedido;
+    int res[P];
+
+    Procedure comprarEntrada(in int: id, out int: numEntrada, out bool: pudeComprar){
+        c.push(id); // encolar el comprador
+        signal(hayPedido); // aviso a la boleteria que hay un pedido
+        wait(espera); // espero a ser atendido por la boleteria
+        numEntrada = res[id]; // recibo la respuesta de la boleteria sobre el
+        if (numEntrada != -1) pudeComprar = true; // si el numero de entrada es negativo, no pude comprar
+        else pudeComprar = false;
+    }
+
+    Procedure sig(out int: id){
+        if (c.isEmpty()) wait(hayPedido); // espero a que haya un pedido de un comprador
+        id = c.pop(); // obtengo el id del comprador que llegó
+    }
+
+    Procedure resp(in int: id, in int: numEntrada){
+        res[id] = numEntrada; // guardo la respuesta de la boleteria para el comprador
+        signal(espera); // aviso al comprador que ya le respondí
+    }
+}
+
+
+// Resolver con MONITORES la siguiente situacion. En un camino turistico hay un puente por donde puede pasar un vehiculo a la vez.
+// Hay N autos que deben pasar por él de acuerdo con el orden de llegada. Nota: solo se puede usar los procesos Autos (y los monitores que sean necesarios);
+// suponga que existe la funcion pasar() que simula el paso del auto por el puente.
+
+Process Auto [id: 0..N-1]{
+    AdminPuente.esperar();
+    pasar(); // simula el paso del auto por el puente
+    AdminPuente.terminar();
+}
+
+Monitor AdminPuente {
+    cond espera;
+    int cant = 0;
+    bool libre = true;
+
+    Procedure esperar(){
+        if (libre) libre = false:
+        else{
+            cant++;
+            wait(espera); // aca no se necesita cola porque el orden de llegada se garantiza al despertar en la variable condicion.
+        }
+    }
+
+    Procedure terminar(){
+        if (cant == 0) libre = true; // si no hay nadie esperando, recien ahí el puente queda libre, para garantizar que sea por orden de llegada y otro proceso que recien está llegando no pase antes del que ya estaba esperando.
+        else{
+            cant--;
+            signal(espera);
+        }
+    }
+}
+
+

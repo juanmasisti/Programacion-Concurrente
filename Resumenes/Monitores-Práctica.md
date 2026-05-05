@@ -48,3 +48,16 @@ Las variables condición (`cond`) son las salas de espera. Elegí la estructura 
 *   **Despertar a uno solo, al azar (Orden FIFO ciego):**
     *   *Cuándo:* Hay un recurso libre y pasa el que sigue en la fila (ej. fotocopiadora básica).
     *   *Cómo:* Una sola variable `cond fila;` y se despierta con `signal(fila);`.
+
+
+# Detectar el Patrón de Monitores a utilizar. Se dividen en 2 grandes grupos:
+
+1. Servidor Pasivo (Autoservicio)
+Palabras clave en el enunciado: "Usa", "Accede", "Pasa por el puente", "Descarga en la playa", "Disfruta del mirador".
+
+La lógica: El recurso es un objeto inanimado (un puente, una impresora compartida, una base de datos). El proceso Cliente entra al monitor/mutex solo para pedir permiso, sale a hacer la acción que lleva tiempo (descargar()), y vuelve a entrar solo para avisar que terminó y cederle el lugar al siguiente.
+
+2. Cliente-Servidor (Servidor Activo / Patrón Sándwich)
+Palabras clave en el enunciado: "Atiende", "Resuelve", "Corrige", "Vende", "El cajero procesa".
+
+La lógica: Hay alguien (o un sistema) trabajando. El Cliente no puede autogestionarse. Entra al monitor, deja el pedido en la cola y se duerme. El Servidor entra al monitor, saca el pedido, sale del monitor para hacer el trabajo pesado (vender(), procesar()), y vuelve a entrar para depositar la respuesta y despertar a ese cliente específico.

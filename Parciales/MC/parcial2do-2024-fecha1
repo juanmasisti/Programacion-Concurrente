@@ -1,0 +1,136 @@
+// Parcial 2024 2do Semestre - Fecha 1
+
+// Se debe simular el uso de un sistema virtual de venta de entradas para un evento musical.
+// El sistema cuenta con C cajeros virutales que atienden indefinidamente. Sin embargo, como la venta 
+// de entradas comienza a una hora determinada, solo atienden a partir del aviso de un Timer. Una vez que 
+// reciben dicho aviso, los cajeros atienden de acuerdo con el orden de llegada de los compradores. La atencion
+// consiste en recibir la solicitud del comprador (datos para el pago) y responderle si pudo comprar (o no) junto
+// al comprobante de la operacion. Para este evento se cuenta con E entradas y N compradores, donde cada comprador puede 
+// solicitar a lo sumo una entrada. Resuelva usando SEMÁFOROS.
+
+sem mutex = 1; // semáforo para proteger la cola
+sem mutexEntradas = 1; // semáforo para proteger el contador de entradas disponibles
+sem hayCompra = 0; // semáforo para que los cajeros sepan que hay un comprador para atender
+sem esperaCompra[N] = ([N], 0); // array de semáforos para que cada comprador espere a ser atendido
+Cola c; // cola para manejar el orden de llegada
+bool pudeComprar[N]; // array para saber si un comprador ya compró o no
+text comprobantes[N]; // array para guardar el comprobante de cada comprador, para que el comprador pueda recibirlo una vez que el cajero le responda si pudo comprar o no
+int cantEntradas = E; // contador de entradas disponibles
+sem iniciaVenta = 0; // semáforo para que los cajeros esperen a que el Timer les avise que ya pueden empezar a atender
+text solicitudes[N]; // array para guardar las solicitudes de los compradores, para que los cajeros puedan acceder a ellas
+
+Process comprador [id: 0..N-1] {
+    bool pudeComprar;
+    text solicitud,comprobante;
+
+    solicitudes[id] = solicitud; // cada comprador tiene una solicitud para hacer al cajero, se guarda en un array para que el cajero pueda acceder a ella
+    P(mutex);
+    c.push(id); // encolar el comprador 
+    V(mutex);
+    V(hayCompra);
+    P(esperaCompra[id]); // esperar a ser atendido por un cajero 
+    pudeComprar = pudeComprar[id]; // recibo la respuesta del cajero sobre si pude comprar o no
+    comprobante = comprobantes[id];  
+}
+
+Process cajero [id: 0..C-1] {
+    int idAux;
+    bool hayEntrada;
+    text solicitud;
+
+    P(iniciaVenta); // espero a que el Timer me avise que ya pueden empezar a atender a los compradores
+    while(true){
+        P(hayCompra); // espero a que me avisen que hay un comprador para atender
+        P(mutex); // mutex para acceder a la cola de compradores
+        idAux = c.pop(); // obtengo el id del comprador que llegó
+        V(mutex);
+        solicitud = solicitudes[idAux]; // obtengo la solicitud del comprador
+        P(mutexEntradas); // mutex para acceder al contador de entradas disponibles
+        if (cantEntradas > 0){
+            cantEntradas--;
+            hayEntrada = true;
+        } else{
+            hayEntrada = false;
+        }
+        V(mutexEntradas);
+        comprobantes[idAux] = GenerarComprobante(hayEntrada); // se simula la generación del comprobante con la función GenerarComprobante()
+        pudeComprar[idAux] = hayEntrada; // guardo la respuesta sobre si el comprador pudo comprar o no
+        V(esperaCompra[idAux]); // aviso al comprador que ya le respondí si pudo comprar o no, y le envío el comprobante
+    }
+}
+
+
+Process Timer {
+    for i = 0..C-1{
+        V(iniciaVenta); // aviso a los cajeros que ya pueden empezar a atender a los compradores
+    }
+}
+
+// Exisisten N personas que desean acceder a un mirador al borde del lago Nahuel Huapi en Bariloche. Como el mirados es
+// angosto, sólo puede ser usado por una persona a la vez. Resuelva con MONITORES los dos casos siguientes:
+// a. El Acceso al mirador es por orden de llegada.
+// b. El acceso al mirador es por orden de llegada, pero dando prioridad a las personas mayores de 60 años.
+
+2.a
+
+Process Persona [id: 0..N-1]{
+    AdminMirador.esperar();
+    // disfrutar del mirador
+    AdminMirador.terminar();
+}
+
+Monitor AdminMirador {
+    cond espera;
+    int cant = 0; // para contar la cantidad de personas esperando
+    bool libre = true;
+
+    Procedure esperar(){
+        if (libre) libre = false;
+        else{
+            cant++;
+            wait(espera); // aca no se necesita cola porque el orden de llegada se garantiza al despertar en la variable condicion.
+        }
+    }
+
+    Procedure terminar(){
+        if (cant == 0) libre = true; // si no hay nadie esperando, el mirador queda libre
+        else{
+            cant--;
+            signal(espera);
+        }
+    }
+}
+
+2.b
+
+Process Persona [id: 0..N-1]{
+    int edad = obtenerEdad(id); // cada persona sabe su edad
+    AdminMirador.esperar(id, edad);
+    // disfrutar del mirador
+    AdminMirador.terminar();
+}
+
+Monitor AdminMirador {
+    cond esperando[N]; // array de variables condición para que cada persona espere a ser atendida, se podria usar una sola variable condicion pero es buena practica si se va a escalar a por ej: 2 miradores atendiendo a la misma cola y tratando de despertar a personas.
+    colaOrdenada cola; // cola ordenada por edad
+    int cant = 0; // para contar la cantidad de personas esperando
+    bool libre = true;
+
+    Procedure esperar(in int: id, in int: edad){
+        if (libre) libre = false;
+        else{
+            cant++;
+            cola.agregarOrdenado(id, edad); // agrego a la persona a la cola ordenada por edad
+            wait(esperando[id]); // la persona espera a ser atendida, se duerme en su variable condicion privada (array de variables condicion). Ya que sino podria despertar a una persona con menor edad que llegó después.
+        }
+    }
+
+    Procedure terminar(){
+        if (cant == 0) libre = true; // si no hay nadie esperando, el mirador queda libre
+        else{
+            cant--;
+            int idAux = cola.extraer(); // saco a la persona con mayor edad de la cola
+            signal(esperando[idAux]);
+        }
+    }
+}

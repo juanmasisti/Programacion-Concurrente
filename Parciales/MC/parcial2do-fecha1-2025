@@ -53,6 +53,7 @@ queue colaPedidos; // cola para manejar el orden de llegada de los clientes que 
 pieza piezas[N]; // array para guardar las piezas que se van a imprimir para cada cliente, para que los clientes puedan verificar si su pedido cumplió lo solicitado una vez que les entreguen su pieza
 
 Process Cliente [id: 0..N-1]{
+        // TODO: no es necesario while true?
         P(mutexCola);
         colaPedidos.push(id); // encola al cliente que hizo el pedido
         V(mutexCola);
